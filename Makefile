@@ -81,6 +81,8 @@ PROGRAMS := \
 	raw/canpump \
 	raw/tst-err \
 	raw/tst-raw \
+	raw/canxl-tx \
+	raw/canxl-rx \
 	raw/tst-raw-filter \
 	raw/tst-raw-sockopt \
 	raw/tst-raw-sendto
