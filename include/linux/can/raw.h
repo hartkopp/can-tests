@@ -65,9 +65,4 @@ enum {
 	CAN_RAW_XL_FRAMES,	/* allow CAN XL frames (default:off) */
 };
 
-/* CAN XL data transfer modes for CAN_RAW_XL_FRAMES sockopt */
-#define CAN_RAW_XL_ENABLE (1 << 0) /* enable CAN XL frames on this socket */
-#define CAN_RAW_XL_RX_DYN (1 << 1) /* allow truncated data[] for read() */
-#define CAN_RAW_XL_TX_DYN (1 << 2) /* allow truncated data[] for write() */
-
 #endif /* !_UAPI_CAN_RAW_H */

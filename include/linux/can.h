@@ -198,9 +198,9 @@ struct canfd_frame {
  * @prio:  11 bit arbitration priority with zero'ed CAN_*_FLAG flags
  * @flags: additional flags for CAN XL
  * @sdt:   SDU (service data unit) type
- * @len:   frame payload length in byte (1 .. CANXL_MAX_DLEN)
+ * @len:   frame payload length in byte (CANXL_MIN_DLEN .. CANXL_MAX_DLEN)
  * @af:    acceptance field
- * @data:  CAN XL frame payload (up to CANXL_MAX_DLEN byte)
+ * @data:  CAN XL frame payload (CANXL_MIN_DLEN .. CANXL_MAX_DLEN byte)
  *
  * @prio shares the same position as @can_id from struct can[fd]_frame.
  */

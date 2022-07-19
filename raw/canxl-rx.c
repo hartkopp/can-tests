@@ -41,7 +41,7 @@ int main(int argc, char **argv)
 	addr.can_family = AF_CAN;
 	addr.can_ifindex = if_nametoindex("vcan2");
 
-	sockopt = (CAN_RAW_XL_ENABLE | CAN_RAW_XL_RX_DYN);
+	sockopt = 1;
 	ret = setsockopt(s, SOL_CAN_RAW, CAN_RAW_XL_FRAMES, &sockopt, sizeof(sockopt));
 	if (ret < 0) {
 		perror("sockopt CAN_RAW_XL_FRAMES");
