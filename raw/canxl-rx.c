@@ -26,10 +26,10 @@ int main(int argc, char **argv)
 	struct sockaddr_can addr;
 
 	union {
-		struct can_frame cf;
-		struct canfd_frame cfd;
-		struct canxl_frame cfx;
-	} c;
+		struct can_frame cc;
+		struct canfd_frame fd;
+		struct canxl_frame xl;
+	} can;
 
 	int nbytes, ret, i;
 	int sockopt = 0;
@@ -42,7 +42,8 @@ int main(int argc, char **argv)
 	addr.can_ifindex = if_nametoindex("vcan2");
 
 	sockopt = 1;
-	ret = setsockopt(s, SOL_CAN_RAW, CAN_RAW_XL_FRAMES, &sockopt, sizeof(sockopt));
+	ret = setsockopt(s, SOL_CAN_RAW, CAN_RAW_XL_FRAMES,
+			 &sockopt, sizeof(sockopt));
 	if (ret < 0) {
 		perror("sockopt CAN_RAW_XL_FRAMES");
 		exit(1);
@@ -55,7 +56,7 @@ int main(int argc, char **argv)
 
 	while (1) {
 
-		nbytes = read(s, &c.cfx, sizeof(struct canxl_frame));
+		nbytes = read(s, &can.xl, sizeof(struct canxl_frame));
 		if (nbytes < 0) {
 			perror("read");
 			return 1;
@@ -67,14 +68,14 @@ int main(int argc, char **argv)
 			return 1;
 		}
 
-		if (c.cfx.flags & CANXL_XLF) {
-			if (nbytes != CANXL_HDR_SZ + c.cfx.len) {
+		if (can.xl.flags & CANXL_XLF) {
+			if (nbytes != CANXL_HDR_SZ + can.xl.len) {
 				printf("nbytes = %d\n", nbytes);
 				perror("read canxl_frame");
 				continue;
 			}
 			printf("canxl frame prio %03X len %d flags %d\n",
-			       c.cfx.prio, c.cfx.len, c.cfx.flags);
+			       can.xl.prio, can.xl.len, can.xl.flags);
 			continue;
 		}
 
@@ -83,17 +84,17 @@ int main(int argc, char **argv)
 			fprintf(stderr, "read: incomplete CAN(FD) frame\n");
 			return 1;
 		} else {
-			if (c.cfd.can_id & CAN_EFF_FLAG)
-				printf("%8X  ", c.cfd.can_id & CAN_EFF_MASK);
+			if (can.fd.can_id & CAN_EFF_FLAG)
+				printf("%8X  ", can.fd.can_id & CAN_EFF_MASK);
 			else
-				printf("%3X  ", c.cfd.can_id & CAN_SFF_MASK);
+				printf("%3X  ", can.fd.can_id & CAN_SFF_MASK);
 
-			printf("[%d] ", c.cfd.len);
+			printf("[%d] ", can.fd.len);
 
-			for (i = 0; i < c.cfd.len; i++) {
-				printf("%02X ", c.cfd.data[i]);
+			for (i = 0; i < can.fd.len; i++) {
+				printf("%02X ", can.fd.data[i]);
 			}
-			if (c.cfd.can_id & CAN_RTR_FLAG)
+			if (can.fd.can_id & CAN_RTR_FLAG)
 				printf("remote request");
 			printf("\n");
 			fflush(stdout);
