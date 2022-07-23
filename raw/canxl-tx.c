@@ -81,8 +81,8 @@ int main(int argc, char **argv)
 	can.xl.flags = CANXL_XLF;
 	memset(can.xl.data, 0x33, CANXL_MAX_DLEN);
 
-	nbytes = write(s, &can.xl, CANXL_HDR_SZ + can.xl.len);
-	if (nbytes != CANXL_HDR_SZ + can.xl.len) {
+	nbytes = write(s, &can.xl, CANXL_HDR_SIZE + can.xl.len);
+	if (nbytes != CANXL_HDR_SIZE + can.xl.len) {
 		printf("nbytes = %d\n", nbytes);
 		perror("write canxl_frame");
 		exit(1);

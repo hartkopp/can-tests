@@ -63,13 +63,13 @@ int main(int argc, char **argv)
 		}
 		printf("nbytes = %d\n", nbytes);
 		
-		if (nbytes < CANXL_HDR_SZ + CANXL_MIN_DLEN) {
+		if (nbytes < CANXL_HDR_SIZE + CANXL_MIN_DLEN) {
 			fprintf(stderr, "read: no CAN frame\n");
 			return 1;
 		}
 
 		if (can.xl.flags & CANXL_XLF) {
-			if (nbytes != CANXL_HDR_SZ + can.xl.len) {
+			if (nbytes != CANXL_HDR_SIZE + can.xl.len) {
 				printf("nbytes = %d\n", nbytes);
 				perror("read canxl_frame");
 				continue;
