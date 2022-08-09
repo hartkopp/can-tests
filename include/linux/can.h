@@ -155,7 +155,7 @@ struct can_frame {
  * lost. CANFD_FDF allows programmers to mark CAN FD frames in the case of
  * using struct canfd_frame for mixed CAN / CAN FD content (dual use).
  * Since the introduction of CAN XL the CANFD_FDF flag is set in all CAN FD
- * frame structures provided by the Linux kernel.
+ * frame structures provided by the CAN subsystem of the Linux kernel.
  */
 #define CANFD_BRS 0x01 /* bit rate switch (second bitrate for payload data) */
 #define CANFD_ESI 0x02 /* error state indicator of the transmitting node */
@@ -217,6 +217,8 @@ struct canxl_frame {
 #define CANFD_MTU	(sizeof(struct canfd_frame))
 #define CANXL_MTU	(sizeof(struct canxl_frame))
 #define CANXL_HDR_SIZE	(offsetof(struct canxl_frame, data))
+#define CANXL_MIN_MTU	(CANXL_HDR_SIZE + 64)
+#define CANXL_MAX_MTU	CANXL_MTU
 
 /* particular protocols of the protocol family PF_CAN */
 #define CAN_RAW		1 /* RAW sockets */
