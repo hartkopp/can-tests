@@ -66,6 +66,7 @@ PROGRAMS := \
 	bcm/tst-bcm-tx-sendto \
 	bcm/tst-bcm-tx_delete \
 	bcm/tst-bcm-tx_read \
+	bcm/tst-bcm-tx_locktest \
 	bcm/tst-bcmfd-cycle \
 	bcm/tst-bcmfd-filter \
 	bcm/cansniffer \
