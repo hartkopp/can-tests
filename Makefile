@@ -60,6 +60,7 @@ PROGRAMS := \
 	bcm/tst-bcm-nframes \
 	bcm/tst-bcm-dump \
 	bcm/tst-bcm-filter \
+	bcm/tst-bcm-recvmsg \
 	bcm/tst-bcm-rtr \
 	bcm/tst-bcm-rx-sendto \
 	bcm/tst-bcm-single \
