@@ -73,6 +73,8 @@ PROGRAMS := \
 	bcm/cansniffer \
 	drv/canfdtest \
 	gw/gwtest \
+	isotp/isotp-client \
+	isotp/isotp-server \
 	netlayer/tst-filter \
 	netlayer/tst-filter-master \
 	netlayer/tst-filter-server \
