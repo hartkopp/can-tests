@@ -112,6 +112,7 @@ int main(int argc, char **argv)
 	int datalen = 0;
 	unsigned int tx_dl = 0;
 	int nbytes = 0;
+	__u8 no_fc = 0;
 	int t;
 	int d;
 
@@ -163,12 +164,16 @@ int main(int argc, char **argv)
 			fprintf(stderr, "read: wrong CAN length\n");
 			return 1;
 		}
+
 		t = cf.data[0];
 		if (t >= MAXTCD) {
 			fprintf(stderr, "read: wrong test case %d\n", t);
 			return 1;
 		}
+
 		d = cf.data[1];
+		no_fc = d & NO_FC;
+		d ^= no_fc;
 		if (d >= MAXTESTLEN) {
 			fprintf(stderr, "read: wrong length case %d\n", d);
 			return 1;
@@ -184,6 +189,9 @@ int main(int argc, char **argv)
 		}
 
 		fill_tt_server(&tt, &tcd[t]);
+
+		if (no_fc)
+			tt.opts.flags |= CAN_ISOTP_CF_BROADCAST;
 
 		printf("Testcase %02d Lencase %02d (", t, d);
 

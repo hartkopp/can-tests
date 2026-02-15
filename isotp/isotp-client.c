@@ -32,6 +32,7 @@ void print_usage(char *prg)
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "	  -t <testcase>\n");
 	fprintf(stderr, "	  -l <lencase>\n");
+	fprintf(stderr, "	  -n (no FC mode)\n");
 	fprintf(stderr, "\n");
 }
 
@@ -120,13 +121,14 @@ int main(int argc, char **argv)
 	int opt, retval = 0;
 	int testcase = -1;
 	int lencase = -1;
+	__u8 no_fc = 0;
 	int t, d;
 
 	/* fill the buffer with the increasing pattern */
 	for (buflen = 0; buflen < BUFSIZE; buflen++)
 		refbuf[buflen] = ((buflen % 0xFF) + 1) & 0xFF;
 
-	while ((opt = getopt(argc, argv, "t:l:?")) != -1) {
+	while ((opt = getopt(argc, argv, "t:l:n?")) != -1) {
 		switch (opt) {
 		case 't':
 			testcase = atoi(optarg);
@@ -142,6 +144,10 @@ int main(int argc, char **argv)
 				fprintf(stderr, "read: wrong length case %d\n", lencase);
 				return 1;
 			}
+			break;
+
+		case 'n':
+			no_fc = NO_FC;
 			break;
 
 		case '?':
@@ -188,6 +194,9 @@ int main(int argc, char **argv)
 			t = testcase;
 
 		fill_tt_client(&tt, &tcd[t]);
+
+		if (no_fc)
+			tt.opts.flags |= CAN_ISOTP_LISTEN_MODE;
 
 		if (tt.llopts.tx_dl)
 			tx_dl = tt.llopts.tx_dl;
@@ -273,7 +282,7 @@ int main(int argc, char **argv)
 			}
 
 			cf.data[0] = t;
-			cf.data[1] = d;
+			cf.data[1] = d | no_fc;
 			cf.data[2] = (datalen[d] >> 16) & 0xFFU;
 			cf.data[3] = (datalen[d] >> 8) & 0xFFU;
 			cf.data[4] = datalen[d] & 0xFFU;
