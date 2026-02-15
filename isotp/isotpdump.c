@@ -62,6 +62,9 @@
 #include <linux/sockios.h>
 
 #include "terminal.h"
+#ifdef CAN_TESTS
+#include "testcases.h"
+#endif
 
 #define NO_CAN_ID 0xFFFFFFFFU
 
@@ -78,19 +81,27 @@ const int canfx_on = 1;
 void print_usage(char *prg)
 {
 	fprintf(stderr, "\nUsage: %s [options] <CAN interface>\n", prg);
+#ifdef CAN_TESTS
+	fprintf(stderr, "( %s is built in can-tests mode )\n", prg);
+#endif
 	fprintf(stderr, "Options:\n");
+#ifndef CAN_TESTS
 	fprintf(stderr, "         -s <can_id>  (source can_id. Use 8 digits for extended IDs)\n");
 	fprintf(stderr, "         -d <can_id>  (destination can_id. Use 8 digits for extended IDs)\n");
 	fprintf(stderr, "         -b <can_id>  (broadcast can_id, Use 8 digits for extended IDs)\n");
 	fprintf(stderr, "         -x <addr>    (extended addressing mode. Use 'any' for all addresses)\n");
 	fprintf(stderr, "         -X <addr>    (extended addressing mode (rx addr). Use 'any' for all)\n");
+#endif
 	fprintf(stderr, "         -c           (color mode)\n");
 	fprintf(stderr, "         -a           (print data also in ASCII-chars)\n");
 	fprintf(stderr, "         -3           (limit printing of CFs to 3 items per PDU)\n");
 	fprintf(stderr, "         -L <length>  (limit the printed data length. Minimum <length> = 8)\n");
 	fprintf(stderr, "         -t <type>    (timestamp: (a)bsolute/(d)elta/(z)ero/(A)bsolute w date)\n");
+#ifndef CAN_TESTS
 	fprintf(stderr, "         -u           (print uds messages)\n");
+#endif
 	fprintf(stderr, "\nCAN IDs and addresses are given and expected in hexadecimal values.\n");
+#ifndef CAN_TESTS
 	fprintf(stderr, "\nUDS output contains a flag which provides information about the type of the \n");
 	fprintf(stderr, "message.\n\n");
 	fprintf(stderr, "Flags:\n");
@@ -98,9 +109,11 @@ void print_usage(char *prg)
 	fprintf(stderr, "       [PSR]  = Positive Service Response\n");
 	fprintf(stderr, "       [NRC]  = Negative Response Code\n");
 	fprintf(stderr, "       [???]  = Unknown (not specified)\n");
+#endif
 	fprintf(stderr, "\n");
 }
 
+#ifndef CAN_TESTS
 void print_uds_message(int service, int nrc)
 {
 	char *service_name;
@@ -204,12 +217,15 @@ void print_uds_message(int service, int nrc)
 	}
 	printf("%s %s", flag, service_name);
 }
+#endif
 
 int main(int argc, char **argv)
 {
 	int s;
 	struct sockaddr_can addr;
+#ifndef CAN_TESTS
 	struct can_filter rfilter[3];
+#endif
 	static union cfu cu;
 	struct can_raw_vcid_options vcid_opts = {
 		.flags = CAN_RAW_XL_VCID_RX_FILTER,
@@ -234,8 +250,10 @@ int main(int argc, char **argv)
 	int dst_cfs = 0;
 	int bst_cfs = 0;
 	int color = 0;
+#ifndef CAN_TESTS
 	int uds_output = 0;
 	int uds_data_start = 0;
+#endif
 	int timestamp = 0;
 	int datidx = 0;
 	unsigned long fflen = 0;
@@ -248,8 +266,13 @@ int main(int argc, char **argv)
 	last_tv.tv_sec  = 0;
 	last_tv.tv_usec = 0;
 
+#ifndef CAN_TESTS
 	while ((opt = getopt(argc, argv, "s:d:b:a3L:x:X:ct:u?")) != -1) {
+#else
+	while ((opt = getopt(argc, argv, "a3L:ct:?")) != -1) {
+#endif
 		switch (opt) {
+#ifndef CAN_TESTS
 		case 's':
 			src = strtoul(optarg, NULL, 16);
 			if (strlen(optarg) > 7)
@@ -267,7 +290,7 @@ int main(int argc, char **argv)
 			if (strlen(optarg) > 7)
 				bst |= CAN_EFF_FLAG;
 			break;
-
+#endif
 		case 'c':
 			color = 1;
 			break;
@@ -279,7 +302,7 @@ int main(int argc, char **argv)
 		case '3':
 			limit_cfs = 1;
 			break;
-
+#ifndef CAN_TESTS
 		case 'x':
 			ext = 1;
 			if (!strncmp(optarg, "any", 3))
@@ -287,7 +310,7 @@ int main(int argc, char **argv)
 			else
 				extaddr = strtoul(optarg, NULL, 16) & 0xFF;
 			break;
-
+#endif
 		case 'L':
 			max_printlen = atoi(optarg);
 			if (max_printlen < 8) {
@@ -296,7 +319,7 @@ int main(int argc, char **argv)
 				exit(1);
 			}
 			break;
-
+#ifndef CAN_TESTS
 		case 'X':
 			rx_ext = 1;
 			if (!strncmp(optarg, "any", 3))
@@ -304,7 +327,7 @@ int main(int argc, char **argv)
 			else
 				rx_extaddr = strtoul(optarg, NULL, 16) & 0xFF;
 			break;
-
+#endif
 		case 't':
 			timestamp = optarg[0];
 			if ((timestamp != 'a') && (timestamp != 'A') &&
@@ -314,11 +337,11 @@ int main(int argc, char **argv)
 				timestamp = 0;
 			}
 			break;
-
+#ifndef CAN_TESTS
 		case 'u':
 		        uds_output = 1;
 			break;
-
+#endif
 		case '?':
 			print_usage(basename(argv[0]));
 			exit(0);
@@ -337,7 +360,11 @@ int main(int argc, char **argv)
 		exit(0);
 	}
 
+#ifndef CAN_TESTS
 	if ((argc - optind) != 1 || src == NO_CAN_ID || dst == NO_CAN_ID) {
+#else
+	if ((argc - optind) != 1) {
+#endif
 		print_usage(basename(argv[0]));
 		exit(0);
 	}
@@ -353,7 +380,8 @@ int main(int argc, char **argv)
 	/* try to enable the CAN XL VCID pass through mode */
 	setsockopt(s, SOL_CAN_RAW, CAN_RAW_XL_VCID_OPTS, &vcid_opts, sizeof(vcid_opts));
 
-
+#ifndef CAN_TESTS
+	/* define CAN filters before bind() */
 	if (src & CAN_EFF_FLAG) {
 		rfilter[0].can_id   = src & (CAN_EFF_MASK | CAN_EFF_FLAG);
 		rfilter[0].can_mask = (CAN_EFF_MASK|CAN_EFF_FLAG|CAN_RTR_FLAG);
@@ -382,6 +410,7 @@ int main(int argc, char **argv)
 		setsockopt(s, SOL_CAN_RAW, CAN_RAW_FILTER, &rfilter, sizeof(rfilter));
 	else
 		setsockopt(s, SOL_CAN_RAW, CAN_RAW_FILTER, &rfilter, sizeof(rfilter) - sizeof(rfilter[0]));
+#endif
 
 	addr.can_family = AF_CAN;
 	addr.can_ifindex = if_nametoindex(argv[optind]);
@@ -427,6 +456,46 @@ int main(int argc, char **argv)
 			framelen = cu.fd.len;
 		}
 
+#ifdef CAN_TESTS
+		/* configure CAN IDs and extended addressing */
+		if (rx_id == CRTL_CAN_ID && framelen == 5) {
+			const struct isotp_testcase_description *t;
+			__u8 tc = *(data);
+
+			if (tc >= MAXTCD)
+				continue;
+
+			t = &tcd[tc];
+
+			/* use a different settings for isotpdump */
+			if (t->extaddr) {
+				/* extended addressing CAN IDs */
+				src = 0x666;
+				dst = 0x555;
+
+				/* configure extended addressing */
+				ext = 1;
+				extaddr = 0xDD;
+				rx_ext = 1;
+				rx_extaddr = 0xEE;
+			} else {
+				/* normal addressing CAN IDs */
+				src = 0x222;
+				dst = 0x111;
+
+				/* disable extended addressing */
+				ext = 0;
+				rx_ext = 0;
+			}
+
+			/* configuration done */
+			continue;
+		}
+
+		/* can-test mode: no CAN filters */
+		if (rx_id != src && rx_id != dst)
+			continue;
+#endif
 		if (rx_id == src && ext && !extany &&
 		    extaddr != *(data))
 			continue;
@@ -439,13 +508,23 @@ int main(int argc, char **argv)
 		n_pci = *(data + ext);
 
 		/* Consecutive Frame limiter enabled? */
-		if (limit_cfs && (n_pci & 0xF0) == 0x20) {
-			if (rx_id == src && src_cfs > 2)
-				continue;
-			if (rx_id == dst && dst_cfs > 2)
-				continue;
-			if (rx_id == bst && bst_cfs > 2)
-				continue;
+		if (limit_cfs) {
+			/* limit CFs */
+			if ((n_pci & 0xF0) == 0x20) {
+				if (rx_id == src && src_cfs > 2)
+					continue;
+				if (rx_id == dst && dst_cfs > 2)
+					continue;
+				if (rx_id == bst && bst_cfs > 2)
+					continue;
+			}
+			/* limit belonging FCs */
+			if ((n_pci & 0xF0) == 0x30) {
+				if (rx_id == dst && src_cfs > 2)
+					continue;
+				if (rx_id == src && dst_cfs > 2)
+					continue;
+			}
 		}
 
 		if (color) {
@@ -519,8 +598,9 @@ int main(int argc, char **argv)
 
 		switch (n_pci & 0xF0) {
 		case 0x00:
+#ifndef CAN_TESTS
 			uds_data_start = 1;
-
+#endif
 			/* Consecutive Frame limiter enabled? */
 			if (limit_cfs) {
 				if (rx_id == src)
@@ -543,8 +623,9 @@ int main(int argc, char **argv)
 			break;
 
 		case 0x10:
+#ifndef CAN_TESTS
 			uds_data_start = 1;
-
+#endif
 			/* Consecutive Frame limiter enabled? */
 			if (limit_cfs) {
 				if (rx_id == src)
@@ -627,6 +708,7 @@ int main(int argc, char **argv)
 				}
 				printf("'");
 			}
+#ifndef CAN_TESTS
 			if (uds_output && uds_data_start) {
 				int offset = 3;
 
@@ -637,6 +719,7 @@ int main(int argc, char **argv)
 				print_uds_message(*(data + datidx), *(data + datidx + 2));
 				uds_data_start = 0;
 			}
+#endif
 		}
 
 		if (color)
