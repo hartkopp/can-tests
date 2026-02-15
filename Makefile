@@ -53,7 +53,8 @@ CPPFLAGS += -Iinclude \
 	    -DSO_RXQ_OVFL=40 \
 	    -DETH_P_CAN=0x000C \
 	    -DPF_CAN=29 \
-	    -DAF_CAN=PF_CAN
+	    -DAF_CAN=PF_CAN \
+	    -DCAN_TESTS
 
 PROGRAMS := \
 	bcm/tst-bcm-cycle \
@@ -75,6 +76,7 @@ PROGRAMS := \
 	gw/gwtest \
 	isotp/isotp-client \
 	isotp/isotp-server \
+	isotp/isotpdump \
 	netlayer/tst-filter \
 	netlayer/tst-filter-master \
 	netlayer/tst-filter-server \
