@@ -78,6 +78,8 @@ static void fill_tt_server(struct isotp_testcase *tt,
 	} else if (tcd->mtu == CANXL_MTU) {
 		tt->xlopts.tx_dl = tcd->tx_dl;
 
+		tt->xlopts.sdt_mode = CAN_CIA_ISO15765_2_SDT;
+
 		tt->xlopts.tx_flags |= CANXL_XLF;
 		if (tcd->sec)
 			tt->xlopts.tx_flags |= CANXL_SEC;
