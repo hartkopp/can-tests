@@ -132,7 +132,7 @@ struct can_isotp_xl_options {
 				/* => rx path supports all LL_DL values */
 
 	canid_t	tx_addr;	/* tx address for ISO 15765-2 channel	*/
-				/* => copy to XL acceptance field (AF)	*/
+				/* => for XL acceptance field (AF)	*/
 
 	canid_t	rx_addr;	/* rx address for ISO 15765-2 channel	*/
 				/* => check of XL acceptance field (AF)	*/
@@ -150,7 +150,14 @@ struct can_isotp_xl_options {
 
 	__u8	rx_vcid;	/* checked for equality in CAN XL frame	*/
 				/* at reception time (incoming)		*/
+
+	__u8	sdt_mode;	/* CAN CiA 611-1 SDT select (06/07/09)	*/
 };
+
+/* CAN CiA 611-1 Service Data Unit Types for ISO 15765-2 or CC/FD tunneling */
+#define CAN_CIA_CC_TUNNEL_SDT	0x06	/* tunneling of CC frames in XL */
+#define CAN_CIA_FD_TUNNEL_SDT	0x07	/* tunneling of FD frames in XL */
+#define CAN_CIA_ISO15765_2_SDT	0x09	/* native ISO 15765-2 N_PDU SDT */
 
 /* flags for isotp behaviour */
 

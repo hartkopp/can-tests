@@ -68,15 +68,28 @@ static void fill_tt_server(struct isotp_testcase *tt,
 
 	/* CC/FD/XL specific settings */
 	if (tcd->mtu == CAN_MTU) {
-		tt->llopts.mtu = CANFD_MTU;
+		tt->llopts.mtu = CAN_MTU;
 		tt->llopts.tx_dl = tcd->tx_dl;
-	} else if (tcd->mtu == CANFD_MTU) {
+	}
+
+	if (tcd->mtu == CANFD_MTU) {
 		tt->llopts.mtu = CANFD_MTU;
 		tt->llopts.tx_dl = tcd->tx_dl;
 		if (tcd->brs)
 			tt->llopts.tx_flags |= CANFD_BRS;
-	} else if (tcd->mtu == CANXL_MTU) {
+	}
+
+	if (tcd->mtu == CANXL_MTU || tcd->xltun) {
 		tt->xlopts.tx_dl = tcd->tx_dl;
+
+		tt->xlopts.sdt_mode = CAN_CIA_ISO15765_2_SDT;
+
+		/* CC/FD tunneling */
+		if (tcd->mtu == CAN_MTU)
+			tt->xlopts.sdt_mode = CAN_CIA_CC_TUNNEL_SDT;
+
+		if (tcd->mtu == CANFD_MTU)
+			tt->xlopts.sdt_mode = CAN_CIA_FD_TUNNEL_SDT;
 
 		tt->xlopts.tx_flags |= CANXL_XLF;
 		if (tcd->sec)
@@ -222,18 +235,29 @@ int main(int argc, char **argv)
 				perror("XL link layer sockopt");
 				exit(1);
 			}
-			printf("%s", (tt.xlopts.tx_flags & CANXL_XLF)?"XL":"--");
-		} else if (tt.llopts.tx_dl) {
+			switch (tt.xlopts.sdt_mode) {
+			case CAN_CIA_ISO15765_2_SDT:
+				printf("XL");
+				break;
+			case CAN_CIA_CC_TUNNEL_SDT:
+				printf("XC");
+				break;
+			case CAN_CIA_FD_TUNNEL_SDT:
+				printf("XF");
+				break;
+			default:
+				printf("--");
+			}
+		}
+		if (tt.llopts.tx_dl) {
 			tx_dl = tt.llopts.tx_dl;
 			if (setsockopt(s, SOL_CAN_ISOTP, CAN_ISOTP_LL_OPTS,
 				       &tt.llopts, sizeof(tt.llopts)) < 0) {
 				perror("link layer sockopt");
 				exit(1);
 			}
-			printf("%s", (tt.llopts.mtu == CANFD_MTU)?"FD":"CC");
-		} else {
-			printf("wrong LL opts!\n");
-			exit(1);
+			if (!(tt.xlopts.tx_flags & CANXL_XLF))
+				printf("%s", (tt.llopts.mtu == CANFD_MTU)?"FD":"CC");
 		}
 
 		printf(") TX_DL 0x%04X (%04d)", tx_dl, tx_dl);
