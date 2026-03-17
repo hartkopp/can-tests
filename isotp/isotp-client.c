@@ -33,6 +33,7 @@ void print_usage(char *prg)
 	fprintf(stderr, "	  -t <testcase>\n");
 	fprintf(stderr, "	  -l <lencase>\n");
 	fprintf(stderr, "	  -n (no FC mode)\n");
+	fprintf(stderr, "	  -w (wait for keypress)\n");
 	fprintf(stderr, "\n");
 }
 
@@ -135,13 +136,14 @@ int main(int argc, char **argv)
 	int testcase = -1;
 	int lencase = -1;
 	__u8 no_fc = 0;
+	bool wait = false;
 	int t, d;
 
 	/* fill the buffer with the increasing pattern */
 	for (buflen = 0; buflen < BUFSIZE; buflen++)
 		refbuf[buflen] = ((buflen % 0xFF) + 1) & 0xFF;
 
-	while ((opt = getopt(argc, argv, "t:l:n?")) != -1) {
+	while ((opt = getopt(argc, argv, "t:l:nw?")) != -1) {
 		switch (opt) {
 		case 't':
 			testcase = atoi(optarg);
@@ -161,6 +163,10 @@ int main(int argc, char **argv)
 
 		case 'n':
 			no_fc = NO_FC;
+			break;
+
+		case 'w':
+			wait = true;
 			break;
 
 		case '?':
@@ -342,10 +348,17 @@ int main(int argc, char **argv)
 				exit(1);
 			}
 
-			printf("ok\n");
+			if (wait)
+				printf("ok (ENTER)");
+			else
+				printf("ok\n");
+
 			fflush(stdout);
 
 			close(s);
+
+			if (wait)
+				getchar();
 
 			if (lencase >= 0)
 				d = MAXTESTLEN;
