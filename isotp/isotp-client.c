@@ -33,6 +33,7 @@ void print_usage(char *prg)
 	fprintf(stderr, "	  -t <testcase>\n");
 	fprintf(stderr, "	  -l <lencase>\n");
 	fprintf(stderr, "	  -n (no FC mode)\n");
+	fprintf(stderr, "	  -v (verbose)\n");
 	fprintf(stderr, "	  -w (wait for keypress)\n");
 	fprintf(stderr, "\n");
 }
@@ -136,6 +137,7 @@ int main(int argc, char **argv)
 	int testcase = -1;
 	int lencase = -1;
 	__u8 no_fc = 0;
+	bool verbose = false;
 	bool wait = false;
 	int t, d;
 
@@ -143,7 +145,7 @@ int main(int argc, char **argv)
 	for (buflen = 0; buflen < BUFSIZE; buflen++)
 		refbuf[buflen] = ((buflen % 0xFF) + 1) & 0xFF;
 
-	while ((opt = getopt(argc, argv, "t:l:nw?")) != -1) {
+	while ((opt = getopt(argc, argv, "t:l:nvw?")) != -1) {
 		switch (opt) {
 		case 't':
 			testcase = atoi(optarg);
@@ -163,6 +165,10 @@ int main(int argc, char **argv)
 
 		case 'n':
 			no_fc = NO_FC;
+			break;
+
+		case 'v':
+			verbose = true;
 			break;
 
 		case 'w':
@@ -228,21 +234,35 @@ int main(int argc, char **argv)
 		datalen[1] = 2;
 		datalen[2] = 3;
 		datalen[3] = 4;
-		datalen[4] = tx_dl - 3;
-		datalen[5] = tx_dl - 2;
-		datalen[6] = tx_dl - 1;
-		datalen[7] = tx_dl;
-		datalen[8] = tx_dl + 1;
-		datalen[9] = 4093;
-		datalen[10] = 4094;
-		datalen[11] = 4095;
-		datalen[12] = 4096;
-		datalen[13] = 4097;
+		datalen[4] = tx_dl - 4;
+		datalen[5] = tx_dl - 3;
+		datalen[6] = tx_dl - 2;
+		datalen[7] = tx_dl - 1;
+		datalen[8] = tx_dl;
+		datalen[9] = tx_dl + 1;
+		datalen[10] = 4093;
+		datalen[11] = 4094;
+		datalen[12] = 4095;
+		datalen[13] = 4096;
+		datalen[14] = 4097;
 
 		for (d = 0; d < MAXTESTLEN; d++) {
 
 			if (lencase >= 0)
 				d = lencase;
+
+			if (verbose) {
+				printf("---\nTestcase %02d Lencase %02d ", t, d);
+				printf("%s ", (tcd[t].check_opt)?"CHKOPT":"------");
+				printf("%s ", (tcd[t].check_pad)?"CHKPAD":"------");
+				printf("%s ", (tcd[t].extaddr)?"EXTADDR":"-------");
+				printf("%s ", (tcd[t].xltun)?"XLTUN":"-----");
+				printf("%s ", (tcd[t].brs)?"BRS":"---");
+				printf("%s ", (tcd[t].sec)?"SEC":"---");
+				printf("%s ", (tcd[t].rrs)?"RRS":"---");
+				printf("%s ", (tcd[t].vcid)?"VCID":"----");
+				printf("\n");
+			}
 
 			printf("Testcase %02d Lencase %02d (", t, d);
 

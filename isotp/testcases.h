@@ -899,7 +899,7 @@ const struct isotp_testcase_description tcd [] = {
 
 #define MAXTCD (sizeof(tcd) / sizeof((tcd)[0]))
 
-#define MAXTESTLEN 14
+#define MAXTESTLEN 15
 
 #define CRTL_CAN_ID 0x777
 #define NO_FC 0x80
