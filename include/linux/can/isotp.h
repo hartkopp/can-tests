@@ -173,8 +173,9 @@ struct can_isotp_xl_options {
 #define CAN_ISOTP_RX_EXT_ADDR	0x0200	/* different rx extended addressing */
 #define CAN_ISOTP_WAIT_TX_DONE	0x0400	/* wait for tx completion */
 #define CAN_ISOTP_SF_BROADCAST	0x0800	/* 1-to-N functional addressing */
-#define CAN_ISOTP_CF_BROADCAST	0x1000	/* 1-to-N transmission w/o FC */
+#define CAN_ISOTP_CF_BROADCAST	0x1000	/* 1-to-N transmission FF w/o FC */
 #define CAN_ISOTP_DYN_FC_PARMS	0x2000	/* dynamic FC parameters BS/STmin */
+#define CAN_ISOTP_MF_BROADCAST	0x4000	/* 1-to-N transmission MF w/o FC */
 
 /* protocol machine default values */
 

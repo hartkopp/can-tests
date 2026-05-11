@@ -185,7 +185,7 @@ int main(int argc, char **argv)
 		}
 
 		d = cf.data[1];
-		no_fc = d & NO_FC;
+		no_fc = d & (NO_FC_FF | NO_FC_MF);
 		d ^= no_fc;
 		if (d >= MAXTESTLEN) {
 			fprintf(stderr, "read: wrong length case %d\n", d);
@@ -203,8 +203,11 @@ int main(int argc, char **argv)
 
 		fill_tt_server(&tt, &tcd[t]);
 
-		if (no_fc)
+		if (no_fc == NO_FC_FF)
 			tt.opts.flags |= CAN_ISOTP_CF_BROADCAST;
+
+		if (no_fc == NO_FC_MF)
+			tt.opts.flags |= CAN_ISOTP_MF_BROADCAST;
 
 		printf("Testcase %02d Lencase %02d (", t, d);
 

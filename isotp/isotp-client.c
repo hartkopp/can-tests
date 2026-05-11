@@ -32,7 +32,8 @@ void print_usage(char *prg)
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "	  -t <testcase>\n");
 	fprintf(stderr, "	  -l <lencase>\n");
-	fprintf(stderr, "	  -n (no FC mode)\n");
+	fprintf(stderr, "	  -n (no FC mode FF)\n");
+	fprintf(stderr, "	  -m (no FC mode MF)\n");
 	fprintf(stderr, "	  -v (verbose)\n");
 	fprintf(stderr, "	  -w (wait for keypress)\n");
 	fprintf(stderr, "\n");
@@ -145,7 +146,7 @@ int main(int argc, char **argv)
 	for (buflen = 0; buflen < BUFSIZE; buflen++)
 		refbuf[buflen] = ((buflen % 0xFF) + 1) & 0xFF;
 
-	while ((opt = getopt(argc, argv, "t:l:nvw?")) != -1) {
+	while ((opt = getopt(argc, argv, "t:l:nmvw?")) != -1) {
 		switch (opt) {
 		case 't':
 			testcase = atoi(optarg);
@@ -164,7 +165,11 @@ int main(int argc, char **argv)
 			break;
 
 		case 'n':
-			no_fc = NO_FC;
+			no_fc = NO_FC_FF;
+			break;
+
+		case 'm':
+			no_fc = NO_FC_MF;
 			break;
 
 		case 'v':

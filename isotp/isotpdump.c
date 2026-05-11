@@ -623,6 +623,7 @@ int main(int argc, char **argv)
 			break;
 
 		case 0x10:
+		case 0x40:
 #ifndef CAN_TESTS
 			uds_data_start = 1;
 #endif
@@ -646,7 +647,13 @@ int main(int argc, char **argv)
 					*(data + ext + 5);
 				datidx = ext + 6;
 			}
-			printf("[FF] ln: %-4lu data:", fflen);
+
+			if ((n_pci & 0xF0) == 0x10)
+				printf("[FF]");
+			else
+				printf("[MF]");
+
+			printf(" ln: %-4lu data:", fflen);
 			break;
 
 		case 0x20:

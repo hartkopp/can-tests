@@ -902,4 +902,5 @@ const struct isotp_testcase_description tcd [] = {
 #define MAXTESTLEN 15
 
 #define CRTL_CAN_ID 0x777
-#define NO_FC 0x80
+#define NO_FC_FF 0x80
+#define NO_FC_MF 0x40
