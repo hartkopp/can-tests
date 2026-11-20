@@ -784,11 +784,17 @@ static void rx_ff_ovflw(struct ft_ctx *ctx, const void *param)
 
 	/* large FF_DL (2^31) */
 	rx_tx(ctx, 8, 8, 0x10, 0x00, 0x80, 0x00, 0x00, 0x00, 1, 2);
-	if (!listen)
+	if (listen) {
+		struct ft_frame f;
+
+		/* same behaviour as for the first FF (see above) */
+		if (ft_peer_next(ctx, &env.p, &f, 100))
+			FT_CHECK(ctx, ft_frame_eq(&f, &fc), "unexpected frame");
+	} else {
 		ft_peer_expect(ctx, &env.p, &fc, 200);
+	}
 
 	/* FF_DL == max_pdu_size => FC.CTS (not in listen mode) */
-	ft_peer_flush(&env.p);
 	rx_tx(ctx, 8, 8, 0x10, 0x00, max >> 24, max >> 16, max >> 8, max, 1, 2);
 	if (listen)
 		ft_peer_expect_none(ctx, &env.p, 50);
