@@ -1673,7 +1673,7 @@ static const struct ft_test tests[] = {
 	  "listen",
 	  "Expected: in CAN_ISOTP_LISTEN_MODE no frames are sent. Observed behaviour for a FF with FF_DL > max_pdu_size is reported.",
 	  "protocolrx.c:isotp_rcv_ff() isotp_send_fc(OVFLW) before the LISTEN_MODE check",
-	  "DEVIATION (if observed): a FC.OVFLW is sent in listen mode (see test output)."),
+	  "DEVIATION (if observed): a FC.OVFLW is sent in listen mode, which can abort transfers between other nodes (fixed by xl-isotp patch 34)."),
 	T("RX-FF-011", "FF_DL close to 2^32", 0, rx_ff_maxdl, NULL,
 	  "Expected: all FF_DL values > max_pdu_size (up to 0xFFFFFFFF) are answered with FC.OVFLW. Observed behaviour is reported.",
 	  "protocolrx.c:isotp_rcv_ff() 'so->rx.len + ae + ff_pci_sz <= so->rx.ll_dl' (u32 arithmetic)",
