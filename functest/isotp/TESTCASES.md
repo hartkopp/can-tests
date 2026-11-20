@@ -708,7 +708,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** Expected: in CAN_ISOTP_LISTEN_MODE no frames are sent. Observed behaviour for a FF with FF_DL > max_pdu_size is reported.
 - **Code:** protocolrx.c:isotp_rcv_ff() isotp_send_fc(OVFLW) before the LISTEN_MODE check
-- **ISO 15765-2:** DEVIATION (if observed): a FC.OVFLW is sent in listen mode (see test output).
+- **ISO 15765-2:** DEVIATION (if observed): a FC.OVFLW is sent in listen mode, which can abort transfers between other nodes (fixed by xl-isotp patch 34).
 
 ### RX-FF-011 .. RX-FF-011-ae (2 variants)
 
