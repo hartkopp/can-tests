@@ -709,6 +709,15 @@ Parameterized test cases with the same behaviour are grouped.
 - **Code:** protocolrx.c:isotp_rcv_ff() isotp_send_fc(OVFLW) before the LISTEN_MODE check
 - **ISO 15765-2:** DEVIATION (if observed): a FC.OVFLW is sent in listen mode (see test output).
 
+### RX-FF-011 .. RX-FF-011-ae (2 variants)
+
+**FF_DL close to 2^32**
+
+- **Variants:** `RX-FF-011`, `RX-FF-011-ae`
+- **Behaviour:** Expected: all FF_DL values > max_pdu_size (up to 0xFFFFFFFF) are answered with FC.OVFLW. Observed behaviour is reported.
+- **Code:** protocolrx.c:isotp_rcv_ff() 'so->rx.len + ae + ff_pci_sz <= so->rx.ll_dl' (u32 arithmetic)
+- **ISO 15765-2:** DEVIATION (if observed): FF_DL >= 0xFFFFFFFA (0xFFFFFFF9 with ext. addressing) wraps around in the single FF check and the FF is ignored without FC.OVFLW.
+
 ### RX-FF-007
 
 **FF during reception**
@@ -798,7 +807,7 @@ Parameterized test cases with the same behaviour are grouped.
 **RX STmin enforcement CC8**
 
 - **Variants:** `RX-CF-009-CC8`, `RX-CF-009-FD64`
-- **Behaviour:** With CAN_ISOTP_FORCE_RXSTMIN CFs received with a timestamp gap < CAN_ISOTP_RX_STMIN are dropped silently, which leads to EILSEQ for the next CF. CFs with larger gaps are accepted. (CF sequences sent with CAN_BCM)
+- **Behaviour:** With CAN_ISOTP_FORCE_RXSTMIN CFs received with a timestamp gap < CAN_ISOTP_RX_STMIN are dropped silently, which leads to EILSEQ for the next CF. CFs with larger gaps are accepted. The gap is measured to the last accepted CF. (CF sequences sent with CAN_BCM)
 - **Code:** protocolrx.c:isotp_rcv_cf() CAN_ISOTP_FORCE_RXSTMIN
 
 ### RX-CF-010

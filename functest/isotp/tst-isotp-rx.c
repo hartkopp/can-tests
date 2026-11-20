@@ -782,8 +782,8 @@ static void rx_ff_ovflw(struct ft_ctx *ctx, const void *param)
 	ft_dut_expect_nopdu(ctx, env.s, 50);
 	ft_dut_expect_noerr(ctx, env.s);
 
-	/* 0xFFFFFFFF */
-	rx_tx(ctx, 8, 8, 0x10, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 1, 2);
+	/* large FF_DL (2^31) */
+	rx_tx(ctx, 8, 8, 0x10, 0x00, 0x80, 0x00, 0x00, 0x00, 1, 2);
 	if (!listen)
 		ft_peer_expect(ctx, &env.p, &fc, 200);
 
@@ -795,6 +795,47 @@ static void rx_ff_ovflw(struct ft_ctx *ctx, const void *param)
 	else
 		rx_expect_fc(ctx, FT_FS_CTS);
 
+	rxenv_close();
+}
+
+static void rx_ff_maxdl(struct ft_ctx *ctx, const void *param)
+{
+	static const uint32_t dls[] = { 0xFFFFFFF0, 0xFFFFFFF8, 0xFFFFFFF9,
+					0xFFFFFFFA, 0xFFFFFFFE, 0xFFFFFFFF };
+	struct ft_isotp_cfg c;
+	struct ft_frame fc, f;
+	unsigned int ae = param ? 1 : 0;
+	unsigned int i;
+
+	ft_cfg_init(&c);
+	if (ae)
+		ft_cfg_variant(&c, FT_V_AE);
+	if (!rxenv_open(ctx, &c))
+		return;
+
+	ft_enc_fc(&env.de, &env.htx, FT_FS_OVFLW, 0, 0, &fc);
+
+	/* Expected: every FF_DL > max_pdu_size => FC.OVFLW */
+	for (i = 0; i < sizeof(dls) / sizeof(dls[0]); i++) {
+		uint32_t dl = dls[i];
+
+		if (ae)
+			rx_tx(ctx, 8, 8, 0xA5, 0x10, 0x00, dl >> 24, dl >> 16,
+			      dl >> 8, dl, 1);
+		else
+			rx_tx(ctx, 8, 8, 0x10, 0x00, dl >> 24, dl >> 16,
+			      dl >> 8, dl, 1, 2);
+
+		if (ft_peer_next(ctx, &env.p, &f, 100)) {
+			FT_CHECK(ctx, ft_frame_eq(&f, &fc),
+				 "FF_DL %08X: unexpected frame", dl);
+		} else {
+			ft_note_dev(ctx, "FF_DL %08X ignored without FC.OVFLW (FF_DL + PCI + AE wraps around in the 'single FF' check)",
+				    dl);
+		}
+	}
+
+	ft_dut_expect_noerr(ctx, env.s);
 	rxenv_close();
 }
 
@@ -1180,8 +1221,10 @@ static void rx_cf_rxstmin(struct ft_ctx *ctx, const void *param)
 					  500);
 			ft_dut_expect_noerr(ctx, env.s);
 		} else {
-			/* 2 ms gap => CF2 dropped, CF3 => wrong SN */
-			ft_bcm_send_seq(ctx, c.iface, &fr[1], n - 1, 2000);
+			/* 6 ms gap => CF2 dropped (6 ms after CF1),
+			 * CF3 accepted (12 ms after CF1) => wrong SN
+			 */
+			ft_bcm_send_seq(ctx, c.iface, &fr[1], n - 1, 6000);
 			ft_dut_expect_err(ctx, env.s, EILSEQ, 500, NULL);
 			ft_dut_expect_nopdu(ctx, env.s, 20);
 		}
@@ -1586,6 +1629,15 @@ static const struct ft_test tests[] = {
 	  "Expected: in CAN_ISOTP_LISTEN_MODE no frames are sent. Observed behaviour for a FF with FF_DL > max_pdu_size is reported.",
 	  "protocolrx.c:isotp_rcv_ff() isotp_send_fc(OVFLW) before the LISTEN_MODE check",
 	  "DEVIATION (if observed): a FC.OVFLW is sent in listen mode (see test output)."),
+	T("RX-FF-011", "FF_DL close to 2^32", 0, rx_ff_maxdl, NULL,
+	  "Expected: all FF_DL values > max_pdu_size (up to 0xFFFFFFFF) are answered with FC.OVFLW. Observed behaviour is reported.",
+	  "protocolrx.c:isotp_rcv_ff() 'so->rx.len + ae + ff_pci_sz <= so->rx.ll_dl' (u32 arithmetic)",
+	  "DEVIATION (if observed): FF_DL >= 0xFFFFFFFA (0xFFFFFFF9 with ext. addressing) wraps around in the single FF check and the FF is ignored without FC.OVFLW."),
+	T("RX-FF-011-ae", "FF_DL close to 2^32 (ext. addr.)", 0, rx_ff_maxdl,
+	  "ae",
+	  "Expected: all FF_DL values > max_pdu_size (up to 0xFFFFFFFF) are answered with FC.OVFLW. Observed behaviour is reported.",
+	  "protocolrx.c:isotp_rcv_ff() 'so->rx.len + ae + ff_pci_sz <= so->rx.ll_dl' (u32 arithmetic)",
+	  "DEVIATION (if observed): FF_DL >= 0xFFFFFFFA (0xFFFFFFF9 with ext. addressing) wraps around in the single FF check and the FF is ignored without FC.OVFLW."),
 	T("RX-FF-007", "FF during reception", 0, rx_ff_restart, NULL,
 	  "A valid FF during a reception restarts the reception with the new PDU (new FC), the old PDU is discarded silently.",
 	  "protocolrx.c:isotp_rcv_ff()",
@@ -1643,11 +1695,11 @@ static const struct ft_test tests[] = {
 	  "protocolrx.c:isotp_rcv_cf() chk_pad_fail()", NULL),
 	T("RX-CF-009-CC8", "RX STmin enforcement CC8", 0, rx_cf_rxstmin,
 	  "CC8",
-	  "With CAN_ISOTP_FORCE_RXSTMIN CFs received with a timestamp gap < CAN_ISOTP_RX_STMIN are dropped silently, which leads to EILSEQ for the next CF. CFs with larger gaps are accepted. (CF sequences sent with CAN_BCM)",
+	  "With CAN_ISOTP_FORCE_RXSTMIN CFs received with a timestamp gap < CAN_ISOTP_RX_STMIN are dropped silently, which leads to EILSEQ for the next CF. CFs with larger gaps are accepted. The gap is measured to the last accepted CF. (CF sequences sent with CAN_BCM)",
 	  "protocolrx.c:isotp_rcv_cf() CAN_ISOTP_FORCE_RXSTMIN", NULL),
 	T("RX-CF-009-FD64", "RX STmin enforcement FD64", 0, rx_cf_rxstmin,
 	  "FD64",
-	  "With CAN_ISOTP_FORCE_RXSTMIN CFs received with a timestamp gap < CAN_ISOTP_RX_STMIN are dropped silently, which leads to EILSEQ for the next CF. CFs with larger gaps are accepted. (CF sequences sent with CAN_BCM)",
+	  "With CAN_ISOTP_FORCE_RXSTMIN CFs received with a timestamp gap < CAN_ISOTP_RX_STMIN are dropped silently, which leads to EILSEQ for the next CF. CFs with larger gaps are accepted. The gap is measured to the last accepted CF. (CF sequences sent with CAN_BCM)",
 	  "protocolrx.c:isotp_rcv_cf() CAN_ISOTP_FORCE_RXSTMIN", NULL),
 	T("RX-CF-010", "RX STmin reset by FC", 0, rx_cf_rxstmin_bs, NULL,
 	  "The RX STmin reference timestamp is reset by each sent FC: the first CF after a FC is always accepted.",
