@@ -974,7 +974,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** Expected: a CAN CC tunnel (SDT 6) socket only processes frames with CAN_DL <= 8. Observed behaviour is reported.
 - **Code:** protocolrx.c:isotp_rcv(), isotp_rcv_ff() (no SDT 6 specific length check)
-- **ISO 15765-2:** DEVIATION (if observed): SDT 6 sockets accept SF/FF/CF with CAN_DL > 8 (see test output).
+- **ISO 15765-2:** DEVIATION (if observed): SDT 6 sockets accept SF/FF/CF with CAN_DL > 8 (fixed by xl-isotp patch 35).
 
 ### XL-SDT7-001
 
@@ -982,6 +982,22 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** A CAN FD tunnel (SDT 7) socket uses CAN FD PDU rules: FF must have a CAN FD DLC length, SF > 8 byte use the CAN FD escape, any sender LL_DL <= 64.
 - **Code:** protocolrx.c:isotp_rcv_ff() fd_pdu(), isotp_rcv()
+
+### XL-SDT7-002
+
+**SDT 7 SF length**
+
+- **Behaviour:** Expected: a CAN FD tunnel (SDT 7) socket only processes frames with a CAN FD data length (<= 8 or a DLC length up to 64). Observed behaviour for SF in the CAN XL SF format with CAN_DL 100 and 13 is reported; a valid CAN FD SF is received.
+- **Code:** protocolrx.c:isotp_check_frame_head() tunnel length check, isotp_rcv() N_PCI_XL_SF
+- **ISO 15765-2:** DEVIATION (if observed): SDT 7 sockets accept SF with CAN_DL > 64 or without CAN FD DLC length (fixed by xl-isotp patch 35).
+
+### XL-SDT7-003
+
+**SDT 7 SF with N_PCI 0x08**
+
+- **Behaviour:** Observation: a CAN FD tunnel (SDT 7) SF with CAN_DL 12 and N_PCI 0x08 0x0A is reported as accepted or ignored (CAN FD only defines N_PCI 0x00 for the SF_DL escape).
+- **Code:** protocolrx.c:isotp_rcv() forced N_PCI_XL_SF for CAN FD PDUs
+- **ISO 15765-2:** REVIEW: with CAN FD PDUs in CAN XL the low nibble bits 0..2 of the SF N_PCI are used as SF_DL bits 10..8, bit 3 is ignored.
 
 ### XL-OPT-001
 

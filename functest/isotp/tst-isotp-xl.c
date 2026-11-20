@@ -487,6 +487,77 @@ static void xl_sdt7_rx(struct ft_ctx *ctx, const void *param)
 	xlenv_close();
 }
 
+/* send a SF and report whether the DUT received it */
+static bool xl_sf_received(struct ft_ctx *ctx, unsigned int len, uint8_t pci0,
+			   uint8_t pci1, unsigned int sfdl)
+{
+	static uint8_t pdu[CANXL_MAX_DLEN];
+	struct ft_frame f;
+	ssize_t n;
+
+	ft_pattern(pdu, sizeof(pdu), len);
+	ft_frame_set(&f, &env.hrx, NULL, len);
+	memset(f.data, 0xCC, len);
+	f.data[0] = pci0;
+	f.data[1] = pci1;
+	memcpy(&f.data[2], pdu, sfdl);
+	ft_peer_tx(ctx, &env.p, &f);
+
+	n = ft_dut_recv(ctx, env.s, f.data, sizeof(f.data), 100);
+	if (n < 0)
+		return false;
+
+	FT_CHECK(ctx, n == (ssize_t)sfdl && !memcmp(f.data, pdu, sfdl),
+		 "unexpected PDU (len %zd)", n);
+	return true;
+}
+
+static void xl_sdt7_sf_len(struct ft_ctx *ctx, const void *param)
+{
+	struct ft_isotp_cfg c;
+
+	cfg_xl(&c, "XL7-64");
+	if (!xlenv_open(ctx, &c))
+		return;
+
+	/* XL SF format with CAN_DL > 64 */
+	if (xl_sf_received(ctx, 100, 0x08, 98, 98))
+		ft_note_dev(ctx, "SDT 7 (CAN FD tunnel) accepts a SF with CAN_DL 100");
+	else
+		ft_log(ctx, "SDT 7: SF with CAN_DL 100 ignored");
+
+	/* XL SF format with CAN_DL 13 (no CAN FD DLC length) */
+	if (xl_sf_received(ctx, 13, 0x08, 11, 11))
+		ft_note_dev(ctx, "SDT 7 (CAN FD tunnel) accepts a SF with CAN_DL 13");
+	else
+		ft_log(ctx, "SDT 7: SF with CAN_DL 13 ignored");
+
+	/* valid CAN FD SF with escape still accepted */
+	FT_CHECK(ctx, xl_sf_received(ctx, 12, 0x00, 10, 10),
+		 "SDT 7: valid SF with CAN_DL 12 not received");
+
+	ft_dut_expect_noerr(ctx, env.s);
+	xlenv_close();
+}
+
+static void xl_sdt7_sf_pci(struct ft_ctx *ctx, const void *param)
+{
+	struct ft_isotp_cfg c;
+
+	cfg_xl(&c, "XL7-64");
+	if (!xlenv_open(ctx, &c))
+		return;
+
+	/* CAN FD only allows N_PCI 0x00 for the SF_DL escape */
+	if (xl_sf_received(ctx, 12, 0x08, 10, 10))
+		ft_log(ctx, "SDT 7: SF with N_PCI 0x08 0x0A accepted (as SF_DL escape)");
+	else
+		ft_log(ctx, "SDT 7: SF with N_PCI 0x08 0x0A ignored");
+
+	ft_dut_expect_noerr(ctx, env.s);
+	xlenv_close();
+}
+
 /* ------------------------------------------------------------------------
  * socket option handling
  * ------------------------------------------------------------------------
@@ -669,10 +740,18 @@ static const struct ft_test tests[] = {
 	T("XL-SDT6-001", "SDT 6 reception of long frames", 0, xl_sdt6_rx, NULL,
 	  "Expected: a CAN CC tunnel (SDT 6) socket only processes frames with CAN_DL <= 8. Observed behaviour is reported.",
 	  "protocolrx.c:isotp_rcv(), isotp_rcv_ff() (no SDT 6 specific length check)",
-	  "DEVIATION (if observed): SDT 6 sockets accept SF/FF/CF with CAN_DL > 8 (see test output)."),
+	  "DEVIATION (if observed): SDT 6 sockets accept SF/FF/CF with CAN_DL > 8 (fixed by xl-isotp patch 35)."),
 	T("XL-SDT7-001", "SDT 7 reception", 0, xl_sdt7_rx, NULL,
 	  "A CAN FD tunnel (SDT 7) socket uses CAN FD PDU rules: FF must have a CAN FD DLC length, SF > 8 byte use the CAN FD escape, any sender LL_DL <= 64.",
 	  "protocolrx.c:isotp_rcv_ff() fd_pdu(), isotp_rcv()", NULL),
+	T("XL-SDT7-002", "SDT 7 SF length", 0, xl_sdt7_sf_len, NULL,
+	  "Expected: a CAN FD tunnel (SDT 7) socket only processes frames with a CAN FD data length (<= 8 or a DLC length up to 64). Observed behaviour for SF in the CAN XL SF format with CAN_DL 100 and 13 is reported; a valid CAN FD SF is received.",
+	  "protocolrx.c:isotp_check_frame_head() tunnel length check, isotp_rcv() N_PCI_XL_SF",
+	  "DEVIATION (if observed): SDT 7 sockets accept SF with CAN_DL > 64 or without CAN FD DLC length (fixed by xl-isotp patch 35)."),
+	T("XL-SDT7-003", "SDT 7 SF with N_PCI 0x08", 0, xl_sdt7_sf_pci, NULL,
+	  "Observation: a CAN FD tunnel (SDT 7) SF with CAN_DL 12 and N_PCI 0x08 0x0A is reported as accepted or ignored (CAN FD only defines N_PCI 0x00 for the SF_DL escape).",
+	  "protocolrx.c:isotp_rcv() forced N_PCI_XL_SF for CAN FD PDUs",
+	  "REVIEW: with CAN FD PDUs in CAN XL the low nibble bits 0..2 of the SF N_PCI are used as SF_DL bits 10..8, bit 3 is ignored."),
 	T("XL-OPT-001", "LL_OPTS after XL_OPTS", 0, xl_opt_order, NULL,
 	  "The TX_DL is set by the last CAN_ISOTP_LL_OPTS or CAN_ISOTP_XL_OPTS call: LL_OPTS after XL_OPTS overrides the XL tx_dl for the transmission (getsockopt still returns the XL tx_dl).",
 	  "isotp.c:isotp_setsockopt_locked() so->tx.ll_dl",
