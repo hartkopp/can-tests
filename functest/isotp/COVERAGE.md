@@ -68,6 +68,7 @@ paths that are not reachable with virtual CAN interfaces.
 | | XL: prio / flags / AF / SDT mismatch | XL-HDR-002, XL-HDR-005 |
 | | XL: AF bits 30/31 ignored | XL-HDR-003, XL-HDR-004 |
 | | XL: VCID mismatch | XL-HDR-002 |
+| | XL: tunneled CC/FD frame length (SDT 6/7) | XL-SDT6-001, XL-SDT7-002 |
 | | CC/FD: CAN ID or frame type mismatch | RX-ID-003, TX-FC-015, XL-HDR-006 |
 | | CC/FD: invalid frame content (len > 8/64) | *n/c* (rejected by CAN_RAW/vcan) |
 | `isotp_rcv()` | CAN_DL < AE + N_PCI (no N_PDU) | RX-SF-003..005, RX-CF-006, TX-FC-010-* |
