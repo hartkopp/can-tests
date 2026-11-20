@@ -44,7 +44,7 @@ paths that are not reachable with virtual CAN interfaces.
 | | 12 bit FF_DL | RX-SEG-* |
 | | 32 bit FF_DL | RX-SEG-* (4096, 8300), RX-FF-003, RX-MF-002 |
 | | 32 bit FF_DL <= 4095 | RX-FF-003 |
-| | FF_DL fits into FF (single FF) | RX-FF-004-* |
+| | FF_DL < FF_DLmin (PDU fits into a SF) | RX-FF-004-* |
 | | u32 wrap around of FF_DL + PCI + AE | RX-FF-011, RX-FF-011-ae (DEVIATION) |
 | | FF_DL > static buffer => kmalloc(max_pdu_size) | *n/c* with default max_pdu_size (needs module parameter > 8300) |
 | | FF_DL > max_pdu_size => FC.OVFLW | RX-FF-005, RX-FF-006 |

@@ -700,7 +700,6 @@ static void rx_ff_escape(struct ft_ctx *ctx, const void *param)
 struct ffmin_param {
 	const char *mode;
 	int var;
-	unsigned int min_ok;	/* smallest accepted FF_DL */
 	unsigned int iso_min;	/* smallest FF_DL according to ISO */
 };
 
@@ -710,7 +709,7 @@ static void rx_ff_min(struct ft_ctx *ctx, const void *param)
 	static uint8_t pdu[4096];
 	struct ft_isotp_cfg c;
 	struct ft_frame *fr;
-	struct ft_frame ff;
+	struct ft_frame ff, f;
 	unsigned int ffdl;
 	int n;
 
@@ -722,25 +721,26 @@ static void rx_ff_min(struct ft_ctx *ctx, const void *param)
 
 	ft_pattern(pdu, sizeof(pdu), 9);
 
-	/* encode a PDU with min_ok bytes and patch the FF_DL */
-	for (ffdl = fp->min_ok - 2; ffdl <= fp->min_ok + 1; ffdl++) {
-		n = ft_enc_pdu(&env.pe, &env.hrx, pdu, fp->min_ok + 2, &fr);
+	/* encode a PDU with iso_min + 1 bytes and patch the FF_DL */
+	for (ffdl = fp->iso_min - 2; ffdl <= fp->iso_min + 1; ffdl++) {
+		n = ft_enc_pdu(&env.pe, &env.hrx, pdu, fp->iso_min + 1, &fr);
 		ff = fr[0];
 		ff.data[env.pe.ae ? 1 : 0] = 0x10 | (ffdl >> 8);
 		ff.data[env.pe.ae ? 2 : 1] = ffdl & 0xFF;
 		ft_log(ctx, "FF_DL %u", ffdl);
 		ft_peer_tx(ctx, &env.p, &ff);
 
-		if (ffdl < fp->min_ok) {
-			ft_peer_expect_none(ctx, &env.p, 50);
-		} else {
-			rx_expect_fc(ctx, FT_FS_CTS);
-			/* the CFs (with more data than needed) */
+		if (ft_peer_next(ctx, &env.p, &f, 50)) {
+			/* FC received => complete the PDU */
 			rx_send_frames(ctx, fr, 1, n);
 			ft_dut_expect_pdu(ctx, env.s, pdu, ffdl, 500);
 			if (ffdl < fp->iso_min)
 				ft_note_dev(ctx, "FF_DL %u accepted (ISO 15765-2 FF_DLmin is %u)",
 					    ffdl, fp->iso_min);
+		} else {
+			FT_CHECK(ctx, ffdl < fp->iso_min,
+				 "FF_DL %u (>= FF_DLmin %u) ignored", ffdl,
+				 fp->iso_min);
 		}
 		free(fr);
 		FT_BAIL(ctx);
@@ -1649,23 +1649,23 @@ static const struct ft_test tests[] = {
 	  "A FF with FF_DL escape (12 bit FF_DL 0) and a 32 bit FF_DL <= 4095 is ignored, FF_DL 4096 is accepted.",
 	  "protocolrx.c:isotp_rcv_ff()", NULL),
 	T("RX-FF-004-CC8", "FF_DL minimum CC8", 0, rx_ff_min,
-	  &((const struct ffmin_param){ "CC8", FT_V_PLAIN, 7, 8 }),
-	  "A FF whose FF_DL fits into the FF itself (FF_DL + PCI + AE <= CAN_DL) is ignored. The smallest accepted FF_DL needs one CF.",
-	  "protocolrx.c:isotp_rcv_ff() 'single FF's are not allowed'",
-	  "DEVIATION: CAN CC FF_DL 7 (normal) / 6 (extended addressing) is accepted although it fits into a SF (ISO 15765-2 FF_DLmin 8 / 7)."),
+	  &((const struct ffmin_param){ "CC8", FT_V_PLAIN, 8 }),
+	  "A FF with FF_DL < FF_DLmin (the PDU fits into a SF of the sender LL_DL: 7-ae for LL_DL 8, LL_DL-2-ae else) is ignored, FF_DL >= FF_DLmin is answered with a FC.",
+	  "protocolrx.c:isotp_rcv_ff() FF_DLmin check",
+	  "DEVIATION (if observed): CAN CC FF_DL 7 (normal) / 6 (extended addressing) is accepted although it fits into a SF (ISO 15765-2 FF_DLmin 8 / 7), fixed by xl-isotp patch 33."),
 	T("RX-FF-004-CC8-ae", "FF_DL minimum CC8 ext. addr.", 0, rx_ff_min,
-	  &((const struct ffmin_param){ "CC8", FT_V_AE, 6, 7 }),
-	  "A FF whose FF_DL fits into the FF itself (FF_DL + PCI + AE <= CAN_DL) is ignored. The smallest accepted FF_DL needs one CF.",
-	  "protocolrx.c:isotp_rcv_ff() 'single FF's are not allowed'",
-	  "DEVIATION: CAN CC FF_DL 7 (normal) / 6 (extended addressing) is accepted although it fits into a SF (ISO 15765-2 FF_DLmin 8 / 7)."),
+	  &((const struct ffmin_param){ "CC8", FT_V_AE, 7 }),
+	  "A FF with FF_DL < FF_DLmin (the PDU fits into a SF of the sender LL_DL: 7-ae for LL_DL 8, LL_DL-2-ae else) is ignored, FF_DL >= FF_DLmin is answered with a FC.",
+	  "protocolrx.c:isotp_rcv_ff() FF_DLmin check",
+	  "DEVIATION (if observed): CAN CC FF_DL 7 (normal) / 6 (extended addressing) is accepted although it fits into a SF (ISO 15765-2 FF_DLmin 8 / 7), fixed by xl-isotp patch 33."),
 	T("RX-FF-004-FD64", "FF_DL minimum FD64", 0, rx_ff_min,
-	  &((const struct ffmin_param){ "FD64", FT_V_PLAIN, 63, 63 }),
-	  "A FF whose FF_DL fits into the FF itself (FF_DL + PCI + AE <= CAN_DL) is ignored. The smallest accepted FF_DL needs one CF.",
-	  "protocolrx.c:isotp_rcv_ff()", NULL),
+	  &((const struct ffmin_param){ "FD64", FT_V_PLAIN, 63 }),
+	  "A FF with FF_DL < FF_DLmin (the PDU fits into a SF of the sender LL_DL: 7-ae for LL_DL 8, LL_DL-2-ae else) is ignored, FF_DL >= FF_DLmin is answered with a FC.",
+	  "protocolrx.c:isotp_rcv_ff() FF_DLmin check", NULL),
 	T("RX-FF-004-XL9-2048", "FF_DL minimum XL9-2048", 0, rx_ff_min,
-	  &((const struct ffmin_param){ "XL9-2048", FT_V_PLAIN, 2047, 2047 }),
-	  "A FF whose FF_DL fits into the FF itself (FF_DL + PCI + AE <= CAN_DL) is ignored. The smallest accepted FF_DL needs one CF.",
-	  "protocolrx.c:isotp_rcv_ff()", NULL),
+	  &((const struct ffmin_param){ "XL9-2048", FT_V_PLAIN, 2047 }),
+	  "A FF with FF_DL < FF_DLmin (the PDU fits into a SF of the sender LL_DL: 7-ae for LL_DL 8, LL_DL-2-ae else) is ignored, FF_DL >= FF_DLmin is answered with a FC.",
+	  "protocolrx.c:isotp_rcv_ff() FF_DLmin check", NULL),
 	T("RX-FF-005", "FF_DL > max_pdu_size", 0, rx_ff_ovflw, NULL,
 	  "A FF with FF_DL > max_pdu_size is answered with FC.OVFLW, the following CFs are ignored and no error is reported. FF_DL == max_pdu_size is answered with FC.CTS.",
 	  "protocolrx.c:isotp_rcv_ff()", NULL),
