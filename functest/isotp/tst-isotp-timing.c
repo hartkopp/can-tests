@@ -302,9 +302,15 @@ out:
  * ------------------------------------------------------------------------
  */
 
+struct echo_param {
+	const char *what;
+	enum ft_if iface;
+};
+
 static void tim_echo(struct ft_ctx *ctx, const void *param)
 {
-	const char *what = param;
+	const struct echo_param *ep = param;
+	const char *what = ep->what;
 	struct ft_isotp_cfg c;
 	struct pollfd pfd;
 	static uint8_t data[100];
@@ -313,11 +319,12 @@ static void tim_echo(struct ft_ctx *ctx, const void *param)
 	ssize_t n;
 	int s;
 
-	if (!ft_need_hw(ctx))
+	if (ep->iface == FT_IF_HW ? !ft_need_hw(ctx) :
+	    !ft_need_echo_if(ctx, ep->iface))
 		return;
 
 	ft_cfg_init(&c);
-	c.iface = FT_IF_HW;
+	c.iface = ep->iface;
 	if (!strcmp(what, "wtd"))
 		c.opts.flags |= CAN_ISOTP_WAIT_TX_DONE;
 	if (!strcmp(what, "cfbc")) {
@@ -341,7 +348,7 @@ static void tim_echo(struct ft_ctx *ctx, const void *param)
 		/* send() returns the result after the echo timeout */
 		t_err = ft_now_ns();
 		FT_CHECK(ctx, n == -ECOMM,
-			 "send() returned %zd %s (another node on the bus?)", n,
+			 "send() returned %zd %s (echo received: another node on the bus / no frame loss?)", n,
 			 n < 0 ? ft_errname(n) : "");
 		ft_dut_expect_noerr(ctx, s);
 	} else {
@@ -376,6 +383,142 @@ static void tim_echo(struct ft_ctx *ctx, const void *param)
 		 "socket not writable after the timeout (revents %X)",
 		 pfd.revents);
 out:
+	close(s);
+}
+
+/* late echo (vcan echo=1 + netem delay 3000ms): the echo of the timed out
+ * SF arrives during the next transfer and must not complete it
+ */
+static void tim_echo_late(struct ft_ctx *ctx, const void *param)
+{
+	struct ft_isotp_cfg c;
+	static uint8_t data[8];
+	int64_t t0, t1;
+	ssize_t n;
+	int s;
+
+	if (!ft_need_echo_if(ctx, FT_IF_EDELAY))
+		return;
+
+	ft_cfg_init(&c);
+	c.iface = FT_IF_EDELAY;
+	c.opts.flags |= CAN_ISOTP_WAIT_TX_DONE;
+	s = ft_isotp_open(ctx, &c);
+	FT_BAIL(ctx);
+
+	/* 1st SF: echo after 3 s => ECOMM after 2 s */
+	ft_pattern(data, 5, 1);
+	t0 = ft_now_ns();
+	n = ft_dut_send(ctx, s, data, 5, 0);
+	t1 = ft_now_ns();
+	FT_CHECK(ctx, n == -ECOMM, "1st send() %zd %s", n,
+		 n < 0 ? ft_errname(n) : "");
+	check_timeout(ctx, t0, t1, 2000 * MS + TXT_DEF);
+
+	/* 2nd SF: the late echo of the 1st SF arrives after 1 s, the own
+	 * echo after 3 s => ECOMM after 2 s (not completed by the 1st echo)
+	 */
+	n = ft_dut_send(ctx, s, data, 4, 0);
+	FT_CHECK(ctx, n == -ECOMM,
+		 "2nd send() %zd %s (completed by the late echo of the 1st SF?)",
+		 n, n < 0 ? ft_errname(n) : "");
+	check_timeout(ctx, t1, ft_now_ns(), 2000 * MS + TXT_DEF);
+
+	/* the late echo of the 2nd SF (after 1 s) changes nothing */
+	ft_sleep_ms(1200);
+	ft_dut_expect_noerr(ctx, s);
+
+	close(s);
+}
+
+/* slow echo (vcan echo=1 + netem delay 100ms): the local echo is the
+ * transmission confirmation which paces the transfer
+ */
+struct slow_param {
+	uint8_t stmin;
+	uint32_t bcflag;
+	int64_t gap;		/* expected gap between the frames */
+};
+
+static void tim_echo_slow(struct ft_ctx *ctx, const void *param)
+{
+	const struct slow_param *sp = param;
+	struct ft_isotp_cfg c;
+	struct ft_peer p;
+	struct ft_enc pe;
+	struct ft_frame hrx, fc, f;
+	struct ft_async a;
+	static uint8_t data[100];
+	int64_t ts[8], t0;
+	unsigned int len = 6 + 3 * 7; /* FF + 3 CFs */
+	int s, i;
+
+	if (!ft_need_echo_if(ctx, FT_IF_ESLOW))
+		return;
+
+	ft_cfg_init(&c);
+	c.iface = FT_IF_ESLOW;
+	c.opts.flags |= CAN_ISOTP_WAIT_TX_DONE | sp->bcflag;
+	s = ft_isotp_open(ctx, &c);
+	FT_BAIL(ctx);
+	if (ft_peer_open(ctx, &p, c.iface)) {
+		close(s);
+		return;
+	}
+
+	ft_enc_peer(&c, &pe);
+	ft_hdr_dut_rx(&c, &hrx);
+
+	/* SF: send() returns after the delayed echo */
+	ft_pattern(data, sizeof(data), 3);
+	t0 = ft_now_ns();
+	FT_CHECK(ctx, ft_dut_send(ctx, s, data, 5, 0) == 5, "SF send()");
+	ft_log(ctx, "SF send() returned after %lld us",
+	       (long long)(ft_now_ns() - t0) / 1000);
+	FT_CHECK(ctx, ft_now_ns() - t0 >= 100 * MS - LOW_SLACK,
+		 "SF send() returned before the (delayed) echo");
+	ft_peer_next(ctx, &p, &f, 500);
+
+	/* segmented PDU: the peer sees the frames after the qdisc delay */
+	ft_async_send(&a, s, data, len, 0);
+	if (!ft_peer_next(ctx, &p, &f, 1000)) {
+		ft_fail(ctx, "no FF");
+		goto out;
+	}
+	ts[0] = f.ts;
+	if (!sp->bcflag) {
+		/* the FC is delayed by the qdisc as well */
+		ft_enc_fc(&pe, &hrx, FT_FS_CTS, 0, sp->stmin, &fc);
+		ft_peer_tx(ctx, &p, &fc);
+	}
+	for (i = 1; i <= 3; i++) {
+		if (!ft_peer_next(ctx, &p, &f, 2000)) {
+			ft_fail(ctx, "CF %d missing", i);
+			goto out;
+		}
+		FT_CHECK(ctx, f.data[0] == (0x20 | i), "CF %d N_PCI %02X", i,
+			 f.data[0]);
+		ts[i] = f.ts;
+	}
+	if (ft_async_join(ctx, &a, 3000))
+		FT_CHECK(ctx, a.ret == (ssize_t)len, "send() %zd %s", a.ret,
+			 a.ret < 0 ? ft_errname(a.ret) : "");
+
+	/* the gap between the CFs starts with the echo of the previous CF */
+	for (i = sp->bcflag ? 1 : 2; i <= 3; i++) {
+		int64_t d = ts[i] - ts[i - 1];
+
+		ft_log(ctx, "gap %d: %lld us (expected %lld us)", i,
+		       (long long)d / 1000, (long long)sp->gap / 1000);
+		FT_CHECK(ctx, d >= sp->gap - LOW_SLACK &&
+			 d <= sp->gap + ft_cfg.tol_ms * MS,
+			 "gap %d: %lld us, expected %lld us", i,
+			 (long long)d / 1000, (long long)sp->gap / 1000);
+	}
+out:
+	if (a.started)
+		ft_async_join(ctx, &a, 4000);
+	ft_peer_close(&p);
 	close(s);
 }
 
@@ -487,23 +630,41 @@ static const struct ft_test tests[] = {
 	  "In listen mode the CF timeout after the FF is 1 s without frame_txtime (ETIMEDOUT).",
 	  "protocolrx.c:isotp_rcv_ff() hrtimer_start(rxtimer)", NULL),
 
-	T("TIM-ECHO-001", "echo timeout SF (WAIT_TX_DONE)", FT_SLOW | FT_TIMING,
-	  tim_echo, "wtd",
-	  "Real CAN interface (FT_IF_HW) without bus partner: when the local echo of a SF does not arrive, the transfer is aborted after 2 s + frame_txtime and send() with CAN_ISOTP_WAIT_TX_DONE returns ECOMM; the socket error is cleared and the socket is idle again.",
-	  "protocoltx.c:isotp_sendmsg() echotimer, hrtimer.c:isotp_echo_timer_handler(), isotp_tx_timeout()", NULL),
-	T("TIM-ECHO-002", "echo timeout SF (asynchronous)", FT_SLOW | FT_TIMING,
-	  tim_echo, "async",
-	  "Real CAN interface (FT_IF_HW) without bus partner: without CAN_ISOTP_WAIT_TX_DONE send() returns immediately; while waiting for the echo the socket is not writable and further send() calls fail with EAGAIN (MSG_DONTWAIT). After 2 s + frame_txtime the socket error ECOMM is reported and the socket is idle again.",
-	  "protocoltx.c:isotp_sendmsg() echotimer, hrtimer.c:isotp_echo_timer_handler()", NULL),
-	T("TIM-ECHO-003", "echo timeout CF broadcast FF", FT_SLOW | FT_TIMING,
-	  tim_echo, "cfbc",
-	  "Real CAN interface (FT_IF_HW) without bus partner: in CF broadcast mode the echo of the FF is monitored; without echo the transfer is aborted after 2 s + frame_txtime with ECOMM.",
-	  "protocoltx.c:isotp_sendmsg() CF broadcast cfecho, hrtimer.c:isotp_echo_timer_handler()", NULL),
-	T("TIM-ECHO-004", "FF without echo (N_Bs)", FT_SLOW | FT_TIMING,
-	  tim_echo, "ff",
-	  "Real CAN interface (FT_IF_HW) without bus partner: the echo of a FF (with FC) is not monitored, the transfer is aborted by the N_Bs timeout after 1 s + frame_txtime with ECOMM.",
-	  "protocoltx.c:isotp_sendmsg() txtimer for ISOTP_WAIT_FIRST_FC",
-	  "REVIEW: N_As (missing transmission confirmation) is monitored with 2 s for SF/CF and covered by N_Bs (1 s) for the FF."),
+#define ECHO(i, t, w, fi, rq, rf, is)					\
+	T("TIM-ECHO-" i, t, FT_SLOW | FT_TIMING, tim_echo,		\
+	  &((const struct echo_param){ w, FT_IF_ELOSS }),		\
+	  "vcan with echo=1 and netem loss 100% (setup_vcan.sh -e): " rq, rf, is), \
+	T("TIM-ECHO-HW-" i, t " (real CAN)", FT_SLOW | FT_TIMING, tim_echo, \
+	  &((const struct echo_param){ w, FT_IF_HW }),			\
+	  "Real CAN interface (FT_IF_HW) without bus partner: " rq, rf, is)
+
+	ECHO("001", "echo timeout SF (WAIT_TX_DONE)", "wtd", 0,
+	     "when the local echo of a SF does not arrive, the transfer is aborted after 2 s + frame_txtime and send() with CAN_ISOTP_WAIT_TX_DONE returns ECOMM; the socket error is cleared and the socket is idle again.",
+	     "protocoltx.c:isotp_sendmsg() echotimer, hrtimer.c:isotp_echo_timer_handler(), isotp_tx_timeout()", NULL),
+	ECHO("002", "echo timeout SF (asynchronous)", "async", 0,
+	     "without CAN_ISOTP_WAIT_TX_DONE send() returns immediately; while waiting for the echo the socket is not writable and further send() calls fail with EAGAIN (MSG_DONTWAIT). After 2 s + frame_txtime the socket error ECOMM is reported and the socket is idle again.",
+	     "protocoltx.c:isotp_sendmsg() echotimer, hrtimer.c:isotp_echo_timer_handler()", NULL),
+	ECHO("003", "echo timeout CF broadcast FF", "cfbc", 0,
+	     "in CF broadcast mode the echo of the FF is monitored; without echo the transfer is aborted after 2 s + frame_txtime with ECOMM.",
+	     "protocoltx.c:isotp_sendmsg() CF broadcast cfecho, hrtimer.c:isotp_echo_timer_handler()", NULL),
+	ECHO("004", "FF without echo (N_Bs)", "ff", 0,
+	     "the echo of a FF (with FC) is not monitored, the transfer is aborted by the N_Bs timeout after 1 s + frame_txtime with ECOMM.",
+	     "protocoltx.c:isotp_sendmsg() txtimer for ISOTP_WAIT_FIRST_FC",
+	     "REVIEW: N_As (missing transmission confirmation) is monitored with 2 s for SF/CF and covered by N_Bs (1 s) for the FF."),
+	T("TIM-ECHO-005", "late echo after echo timeout", FT_SLOW | FT_TIMING,
+	  tim_echo_late, NULL,
+	  "vcan with echo=1 and netem delay 3000ms (setup_vcan.sh -e): a SF whose echo arrives after 3 s is aborted after 2 s + frame_txtime with ECOMM. The late echo arriving during the next SF transfer does not complete that transfer (echo identified by the skb uid), which is aborted with ECOMM as well.",
+	  "protocoltx.c:isotp_rcv_echo() cfecho / can_skb_uid check", NULL),
+	T("TIM-ECHO-006", "slow echo paces CFs (STmin 10 ms)", FT_TIMING,
+	  tim_echo_slow,
+	  &((const struct slow_param){ 0x0A, 0, 100 * MS + 10 * MS + TXT_DEF }),
+	  "vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): a SF send() with WAIT_TX_DONE returns after the delayed echo. The separation time between CFs (STmin + frame_txtime) starts at the echo (transmission confirmation) of the previous CF: gap = echo delay + STmin + frame_txtime.",
+	  "protocoltx.c:isotp_rcv_echo() txfrtimer start", NULL),
+	T("TIM-ECHO-007", "slow echo paces CF broadcast", FT_TIMING,
+	  tim_echo_slow,
+	  &((const struct slow_param){ 0, CAN_ISOTP_CF_BROADCAST, 100 * MS + TXT_DEF }),
+	  "vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): in CF broadcast mode each frame (incl. the FF) is sent after the echo of the previous frame + frame_txtime.",
+	  "protocoltx.c:isotp_rcv_echo() txfrtimer start", NULL),
 };
 
 int main(int argc, char **argv)

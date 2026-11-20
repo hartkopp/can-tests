@@ -46,6 +46,9 @@ struct ft_config ft_cfg = {
 		[FT_IF_XL512] = "vcaniso3",
 		[FT_IF_XL256] = "vcaniso4",
 		[FT_IF_DOWN] = "vcaniso5",
+		[FT_IF_ELOSS] = "vcaniso6",
+		[FT_IF_EDELAY] = "vcaniso7",
+		[FT_IF_ESLOW] = "vcaniso8",
 		[FT_IF_HW] = "",	/* only via environment variable */
 	},
 	.verbose = 0,
@@ -61,6 +64,9 @@ static const char *ft_if_env[FT_IF_MAX] = {
 	[FT_IF_XL512] = "FT_IF_XL512",
 	[FT_IF_XL256] = "FT_IF_XL256",
 	[FT_IF_DOWN] = "FT_IF_DOWN",
+	[FT_IF_ELOSS] = "FT_IF_ELOSS",
+	[FT_IF_EDELAY] = "FT_IF_EDELAY",
+	[FT_IF_ESLOW] = "FT_IF_ESLOW",
 	[FT_IF_HW] = "FT_IF_HW",
 };
 
@@ -209,20 +215,18 @@ bool ft_need_if(struct ft_ctx *ctx, enum ft_if i)
 	return false;
 }
 
-bool ft_need_hw(struct ft_ctx *ctx)
+bool ft_need_echo_if(struct ft_ctx *ctx, enum ft_if i)
 {
-	const char *name = ft_cfg.ifname[FT_IF_HW];
+	const char *name = ft_cfg.ifname[i];
 	char path[128];
 	unsigned long flags = 0;
 	FILE *f;
 
-	if (!name || !*name) {
-		ft_skip(ctx, "no real CAN interface given (set FT_IF_HW=<canX>, interface up, no other node on the bus)");
+	if (!ft_ifindex(i)) {
+		ft_skip(ctx, "interface %s not available (run 'setup_vcan.sh -e up' for the vcan echo interfaces)",
+			name);
 		return false;
 	}
-
-	if (!ft_need_if(ctx, FT_IF_HW))
-		return false;
 
 	snprintf(path, sizeof(path), "/sys/class/net/%s/flags", name);
 	f = fopen(path, "r");
@@ -241,12 +245,24 @@ bool ft_need_hw(struct ft_ctx *ctx)
 
 	/* without IFF_ECHO the CAN core creates the echo immediately */
 	if (!(flags & IFF_ECHO)) {
-		ft_skip(ctx, "interface %s has no IFF_ECHO (echo by the CAN core)",
+		ft_skip(ctx, "interface %s has no IFF_ECHO (vcan needs echo=1, see setup_vcan.sh -e)",
 			name);
 		return false;
 	}
 
 	return true;
+}
+
+bool ft_need_hw(struct ft_ctx *ctx)
+{
+	const char *name = ft_cfg.ifname[FT_IF_HW];
+
+	if (!name || !*name) {
+		ft_skip(ctx, "no real CAN interface given (set FT_IF_HW=<canX>, interface up, no other node on the bus)");
+		return false;
+	}
+
+	return ft_need_echo_if(ctx, FT_IF_HW);
 }
 
 int64_t ft_ts_ns(const struct timespec *ts)
@@ -1754,11 +1770,14 @@ static void ft_usage(const char *prg, const char *suite)
 		"Interfaces (environment variables, default):\n"
 		"  FT_IF_CC (%s) FT_IF_FD (%s) FT_IF_XL (%s)\n"
 		"  FT_IF_XL512 (%s) FT_IF_XL256 (%s) FT_IF_DOWN (%s)\n"
+		"  FT_IF_ELOSS (%s) FT_IF_EDELAY (%s) FT_IF_ESLOW (%s)\n"
 		"  FT_IF_HW (optional real CAN interface without bus partner)\n",
 		prg, suite, prg, ft_cfg.tol_ms, ft_cfg.watchdog_s,
 		ft_cfg.ifname[FT_IF_CC], ft_cfg.ifname[FT_IF_FD],
 		ft_cfg.ifname[FT_IF_XL], ft_cfg.ifname[FT_IF_XL512],
-		ft_cfg.ifname[FT_IF_XL256], ft_cfg.ifname[FT_IF_DOWN]);
+		ft_cfg.ifname[FT_IF_XL256], ft_cfg.ifname[FT_IF_DOWN],
+		ft_cfg.ifname[FT_IF_ELOSS], ft_cfg.ifname[FT_IF_EDELAY],
+		ft_cfg.ifname[FT_IF_ESLOW]);
 }
 
 static bool ft_match(const char *list, const char *id)
@@ -1941,10 +1960,13 @@ int ft_main(int argc, char **argv, const char *suite,
 	close(i);
 
 	printf("# CAN_ISOTP functional test suite: %s\n", suite);
-	printf("# interfaces: CC %s FD %s XL %s XL512 %s XL256 %s DOWN %s HW %s\n",
+	printf("# interfaces: CC %s FD %s XL %s XL512 %s XL256 %s DOWN %s\n"
+	       "# echo interfaces: LOSS %s DELAY %s SLOW %s HW %s\n",
 	       ft_cfg.ifname[FT_IF_CC], ft_cfg.ifname[FT_IF_FD],
 	       ft_cfg.ifname[FT_IF_XL], ft_cfg.ifname[FT_IF_XL512],
 	       ft_cfg.ifname[FT_IF_XL256], ft_cfg.ifname[FT_IF_DOWN],
+	       ft_cfg.ifname[FT_IF_ELOSS], ft_cfg.ifname[FT_IF_EDELAY],
+	       ft_cfg.ifname[FT_IF_ESLOW],
 	       *ft_cfg.ifname[FT_IF_HW] ? ft_cfg.ifname[FT_IF_HW] : "-");
 	printf("# timing tolerance %d ms%s\n", ft_cfg.tol_ms,
 	       ft_cfg.quick ? ", quick mode" : "");

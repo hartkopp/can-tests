@@ -95,6 +95,9 @@ enum ft_if {
 	FT_IF_XL512,	/* vcaniso3 MTU 524 */
 	FT_IF_XL256,	/* vcaniso4 MTU 268 */
 	FT_IF_DOWN,	/* vcaniso5 MTU 16, interface down */
+	FT_IF_ELOSS,	/* vcaniso6 vcan echo=1 + netem loss 100% */
+	FT_IF_EDELAY,	/* vcaniso7 vcan echo=1 + netem delay 3000ms */
+	FT_IF_ESLOW,	/* vcaniso8 vcan echo=1 + netem delay 100ms */
 	FT_IF_HW,	/* optional real CAN interface without bus partner */
 	FT_IF_MAX
 };
@@ -161,6 +164,8 @@ bool ft_need_if(struct ft_ctx *ctx, enum ft_if i);
  * interface up and with IFF_ECHO (local echo after successful transmission)
  */
 bool ft_need_hw(struct ft_ctx *ctx);
+/* skip the test case if the interface is not up or has no IFF_ECHO */
+bool ft_need_echo_if(struct ft_ctx *ctx, enum ft_if i);
 
 /* time helpers (CLOCK_REALTIME to match SO_TIMESTAMPNS values) */
 int64_t ft_now_ns(void);

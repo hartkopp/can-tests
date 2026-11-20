@@ -65,6 +65,10 @@ fi
 	echo "max_pdu_size:  $(cat /sys/module/can_isotp/parameters/max_pdu_size 2>/dev/null || echo n/a)"
 	echo "rmem_max:      $(cat /proc/sys/net/core/rmem_max)"
 	echo "cpus:          $(nproc)"
+	echo "vcan echo:     $(cat /sys/module/vcan/parameters/echo 2>/dev/null || echo n/a)"
+	for i in vcaniso6 vcaniso7 vcaniso8; do
+		[ -e /sys/class/net/$i ] && echo "$i: $(tc qdisc show dev $i 2>/dev/null | head -n 1)"
+	done
 	echo "FT_IF_HW:      ${FT_IF_HW:-not set}"
 	[ -n "$FT_IF_HW" ] && ip -details -statistics link show "$FT_IF_HW"
 	echo

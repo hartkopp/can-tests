@@ -63,17 +63,39 @@ existing `vcanX` interfaces):
 | vcaniso3 | 524 | CAN XL (512 byte data) |
 | vcaniso4 | 268 | CAN XL (256 byte data) |
 | vcaniso5 | 16 | CAN CC, interface down (ENETDOWN tests) |
+| vcaniso6..8 | 16 | optional, vcan echo=1 + netem (`setup_vcan.sh -e`, see below) |
 
 Other interface names can be given with the environment variables
 `FT_IF_CC`, `FT_IF_FD`, `FT_IF_XL`, `FT_IF_XL512`, `FT_IF_XL256` and
 `FT_IF_DOWN`. Test cases for missing interfaces are skipped.
 
+### Echo timeout: vcan echo=1 + netem
+
+Without the vcan module parameter `echo=1` the CAN core creates the local
+echo directly after the frame is queued, so it can not be delayed or
+suppressed. With `echo=1` the vcan driver creates the echo after the
+frame has passed the qdisc, and a netem qdisc can drop or delay it:
+
+```bash
+sudo ./setup_vcan.sh -e up
+```
+
+| Interface | qdisc | Usage |
+|---|---|---|
+| vcaniso6 | netem loss 100% | echo never arrives (like a missing ACK) |
+| vcaniso7 | netem delay 3000ms | echo arrives after the 2 s echo timeout |
+| vcaniso8 | netem delay 100ms | slow transmission confirmation |
+
+The `echo` parameter applies to all vcan interfaces of the system. The
+script reloads the vcan module only if no other vcan interfaces than
+`vcaniso*` exist (`-f` forces the reload and removes all vcan
+interfaces). All other test cases work with `echo=1` as well. The test
+cases `TIM-ECHO-001..007` are skipped without these interfaces.
+
 ### Optional real CAN interface (echo timeout)
 
-The local echo of virtual CAN interfaces always arrives, so the echo
-timeout (2 s, `ISOTP_ECHO_TIMEOUT`) can only be tested with a real CAN
-interface. The test cases `TIM-ECHO-*` (timing suite) run when
-`FT_IF_HW` names such an interface:
+The test cases `TIM-ECHO-HW-*` (timing suite) run the echo timeout tests
+on a real CAN interface when `FT_IF_HW` names such an interface:
 
 - the interface is configured (bitrate) and up, its driver supports
   `IFF_ECHO` (echo after successful transmission),
@@ -81,7 +103,7 @@ interface. The test cases `TIM-ECHO-*` (timing suite) run when
   frames are never acknowledged.
 
 ```bash
-FT_IF_HW=can0 ./run_tests.sh -s timing -t 'TIM-ECHO-*'
+FT_IF_HW=can0 ./run_tests.sh -s timing -t 'TIM-ECHO-HW-*'
 ```
 
 The unacknowledged frames stay pending in the CAN controller / tx queue.

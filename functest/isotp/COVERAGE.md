@@ -106,6 +106,8 @@ paths that are not reachable with virtual CAN interfaces.
 | `isotp_rcv_echo()` | foreign skb (other socket) | TX-FC-014-*, E2E-MC-*, E2E-SNIFF-* |
 | | no can_skb_ext | *n/c* (WARN) |
 | | echo of a FF (no cfecho) | all segmented TX tests |
+| | late echo of a timed out transfer (uid mismatch) | TIM-ECHO-005 |
+| | echo delay paces the CFs (txfrtimer starts at the echo) | TIM-ECHO-006, TIM-ECHO-007 |
 | | not in SENDING state | *n/c* (race) |
 | | transfer complete | TX-SEG-*, TX-WTD-* |
 | | block size reached => wait for FC | TX-FC-001-*, TX-FC-017, TIM-NBS-003 |
@@ -139,7 +141,7 @@ paths that are not reachable with virtual CAN interfaces.
 | | not in WAIT_DATA | *n/c* (race) |
 | `isotp_tx_timeout()` | N_Bs timeout => ECOMM | TX-FC-006, TX-FC-016, TX-FC-017, TIM-NBS-*, API-IO-011 |
 | | IDLE / SHUTDOWN / state changed | *n/c* (race) |
-| `isotp_echo_timer_handler()` | missing local echo => ECOMM | TIM-ECHO-001..003 (only with a real CAN interface, `FT_IF_HW`) |
+| `isotp_echo_timer_handler()` | missing local echo => ECOMM | TIM-ECHO-001..003 (vcan echo=1 + netem loss, `setup_vcan.sh -e`), TIM-ECHO-HW-001..003 (real CAN, `FT_IF_HW`) |
 | `isotp_txfr_timer_handler()` | send next CF after tx_gap | TIM-STM-*, TIM-BC-* |
 
 ## isotp.c
