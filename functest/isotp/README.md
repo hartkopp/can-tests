@@ -63,7 +63,7 @@ existing `vcanX` interfaces):
 | vcaniso3 | 524 | CAN XL (512 byte data) |
 | vcaniso4 | 268 | CAN XL (256 byte data) |
 | vcaniso5 | 16 | CAN CC, interface down (ENETDOWN tests) |
-| vcaniso6..8 | 16 | optional, vcan echo=1 + netem (`setup_vcan.sh -e`, see below) |
+| vcaniso6..9 | 16 | optional, vcan echo=1 + netem (`setup_vcan.sh -e`, see below) |
 
 Other interface names can be given with the environment variables
 `FT_IF_CC`, `FT_IF_FD`, `FT_IF_XL`, `FT_IF_XL512`, `FT_IF_XL256` and
@@ -84,13 +84,19 @@ sudo ./setup_vcan.sh -e up
 |---|---|---|
 | vcaniso6 | netem loss 100% | echo never arrives (like a missing ACK) |
 | vcaniso7 | netem delay 3000ms | echo arrives after the 2 s echo timeout |
-| vcaniso8 | netem delay 100ms | slow transmission confirmation |
+| vcaniso8 | netem delay 100ms | slow transmission confirmation (see FINDING below) |
+| vcaniso9 | tbf rate 2kbit | slow bus: 64 ms per CAN CC frame |
+
+netem orphans skbs when a delay is configured. The CF skbs of CAN_ISOTP
+(`alloc_skb()` + `can_skb_set_owner()`) lose `skb->sk` and their echo is
+not recognized by `isotp_rcv_echo()`; TIM-ECHO-006/007 report this as
+`# FINDING`. tbf keeps the socket reference.
 
 The `echo` parameter applies to all vcan interfaces of the system. The
 script reloads the vcan module only if no other vcan interfaces than
 `vcaniso*` exist (`-f` forces the reload and removes all vcan
 interfaces). All other test cases work with `echo=1` as well. The test
-cases `TIM-ECHO-001..007` are skipped without these interfaces.
+cases `TIM-ECHO-001..010` are skipped without these interfaces.
 
 ### Optional real CAN interface (echo timeout)
 
@@ -158,6 +164,8 @@ not ok 22 - RX-SF-013 invalid SF during reception
   the trace instead of failing.
 - `# REVIEW`: the behaviour is implementation specific or has to be
   checked against the ISO 15765-2 text.
+- `# FINDING`: an implementation issue that is no ISO 15765-2 deviation
+  (reported dynamically when observed).
 - `# SKIP`: interface missing or slow test case in quick mode.
 
 The last line of each suite contains the totals.

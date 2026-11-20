@@ -1246,17 +1246,43 @@ Parameterized test cases with the same behaviour are grouped.
 
 ### TIM-ECHO-006
 
-**slow echo paces CFs (STmin 10 ms)**
+**netem delayed echo (STmin 10 ms)**
 
-- **Behaviour:** vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): a SF send() with WAIT_TX_DONE returns after the delayed echo. The separation time between CFs (STmin + frame_txtime) starts at the echo (transmission confirmation) of the previous CF: gap = echo delay + STmin + frame_txtime.
-- **Code:** protocoltx.c:isotp_rcv_echo() txfrtimer start
+- **Behaviour:** vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): a SF send() with WAIT_TX_DONE returns after the delayed echo. Expected: the separation time between CFs (STmin + frame_txtime) starts at the echo of the previous CF (gap = echo delay + STmin + frame_txtime). Observed behaviour is reported.
+- **Code:** protocoltx.c:isotp_send_cframe() alloc_skb()/can_skb_set_owner(), isotp_rcv_echo() skb->sk check, sch_netem.c:netem_enqueue() skb_orphan_partial()
+- **ISO 15765-2:** FINDING (if observed): netem with delay orphans the CF skbs (sock_efree destructor), the CF echo is not recognized and the transfer is aborted with ECOMM.
 - **Flags:** timing
 
 ### TIM-ECHO-007
 
-**slow echo paces CF broadcast**
+**netem delayed echo (CF broadcast)**
 
-- **Behaviour:** vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): in CF broadcast mode each frame (incl. the FF) is sent after the echo of the previous frame + frame_txtime.
+- **Behaviour:** vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): expected: in CF broadcast mode each frame (incl. the FF) is sent after the echo of the previous frame + frame_txtime. Observed behaviour is reported.
+- **Code:** protocoltx.c:isotp_send_cframe() alloc_skb()/can_skb_set_owner(), isotp_rcv_echo() skb->sk check, sch_netem.c:netem_enqueue() skb_orphan_partial()
+- **ISO 15765-2:** FINDING (if observed): netem with delay orphans the CF skbs (sock_efree destructor), the CF echo is not recognized and the transfer is aborted with ECOMM.
+- **Flags:** timing
+
+### TIM-ECHO-008
+
+**slow bus paces CFs (tbf, STmin 0)**
+
+- **Behaviour:** vcan with echo=1 and tbf rate 2kbit (setup_vcan.sh -e, 64 ms per CAN CC frame): the transfer completes and the CFs are paced by the transmission confirmation (echo): gap = max(frame time, STmin + frame_txtime) = 64 ms.
+- **Code:** protocoltx.c:isotp_rcv_echo()
+- **Flags:** timing
+
+### TIM-ECHO-009
+
+**slow bus paces CFs (tbf, STmin 100 ms)**
+
+- **Behaviour:** vcan with echo=1 and tbf rate 2kbit (setup_vcan.sh -e, 64 ms per CAN CC frame): with STmin 100 ms > frame time the gap between CFs is STmin + frame_txtime, measured from the echo of the previous CF.
 - **Code:** protocoltx.c:isotp_rcv_echo() txfrtimer start
+- **Flags:** timing
+
+### TIM-ECHO-010
+
+**slow bus paces CF broadcast (tbf)**
+
+- **Behaviour:** vcan with echo=1 and tbf rate 2kbit (setup_vcan.sh -e, 64 ms per CAN CC frame): in CF broadcast mode the CFs are paced by the transmission confirmation (gap between the CFs = frame time).
+- **Code:** protocoltx.c:isotp_rcv_echo()
 - **Flags:** timing
 

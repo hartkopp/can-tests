@@ -66,8 +66,9 @@ fi
 	echo "rmem_max:      $(cat /proc/sys/net/core/rmem_max)"
 	echo "cpus:          $(nproc)"
 	echo "vcan echo:     $(cat /sys/module/vcan/parameters/echo 2>/dev/null || echo n/a)"
-	for i in vcaniso6 vcaniso7 vcaniso8; do
-		[ -e /sys/class/net/$i ] && echo "$i: $(tc qdisc show dev $i 2>/dev/null | head -n 1)"
+	TC=$(command -v tc || echo /sbin/tc)
+	for i in vcaniso6 vcaniso7 vcaniso8 vcaniso9; do
+		[ -e /sys/class/net/$i ] && echo "$i: $($TC qdisc show dev $i 2>/dev/null | head -n 1)"
 	done
 	echo "FT_IF_HW:      ${FT_IF_HW:-not set}"
 	[ -n "$FT_IF_HW" ] && ip -details -statistics link show "$FT_IF_HW"
@@ -110,6 +111,9 @@ set +f
 	echo
 	echo "test cases with DEVIATION from ISO 15765-2:"
 	grep -h "# DEVIATION" "$LOGDIR"/*.log | sed 's/^ok [0-9]* - /  /'
+	echo
+	echo "test cases with FINDING (implementation issue, no ISO deviation):"
+	grep -h "# FINDING" "$LOGDIR"/*.log | sed 's/^ok [0-9]* - /  /'
 	echo
 	echo "test cases with REVIEW note:"
 	grep -h "# REVIEW" "$LOGDIR"/*.log | sed 's/^ok [0-9]* - /  /'

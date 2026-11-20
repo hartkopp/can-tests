@@ -98,6 +98,7 @@ enum ft_if {
 	FT_IF_ELOSS,	/* vcaniso6 vcan echo=1 + netem loss 100% */
 	FT_IF_EDELAY,	/* vcaniso7 vcan echo=1 + netem delay 3000ms */
 	FT_IF_ESLOW,	/* vcaniso8 vcan echo=1 + netem delay 100ms */
+	FT_IF_ERATE,	/* vcaniso9 vcan echo=1 + tbf rate 2kbit */
 	FT_IF_HW,	/* optional real CAN interface without bus partner */
 	FT_IF_MAX
 };
@@ -117,6 +118,7 @@ struct ft_ctx {
 	int failed;
 	int skipped;
 	int ndev;		/* dynamic deviation notes */
+	int nfind;		/* implementation findings */
 	FILE *log;		/* trace (memstream) */
 	char *logbuf;
 	size_t loglen;
@@ -135,6 +137,9 @@ void ft_fail_at(struct ft_ctx *ctx, const char *file, int line,
 void ft_skip(struct ft_ctx *ctx, const char *fmt, ...)
 	__attribute__((format(printf, 2, 3)));
 void ft_note_dev(struct ft_ctx *ctx, const char *fmt, ...)
+	__attribute__((format(printf, 2, 3)));
+/* implementation finding (no ISO deviation), test case passes */
+void ft_note_finding(struct ft_ctx *ctx, const char *fmt, ...)
 	__attribute__((format(printf, 2, 3)));
 
 #define ft_fail(ctx, ...) ft_fail_at(ctx, __FILE__, __LINE__, __VA_ARGS__)
