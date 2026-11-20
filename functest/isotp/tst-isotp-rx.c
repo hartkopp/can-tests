@@ -1104,6 +1104,45 @@ out:
 	rxenv_close();
 }
 
+static void rx_cf_short_last(struct ft_ctx *ctx, const void *param)
+{
+	int dl = *(const int *)param;
+	uint8_t pdu[20];
+	struct ft_frame *fr = NULL;
+	ssize_t n;
+	uint8_t buf[32];
+	int nf;
+
+	if (!rxenv_mode(ctx, NULL, 0))
+		return;
+
+	/* 20 byte: FF (6), CF1 (7), CF2 (7) */
+	nf = rx_start(ctx, 20, pdu, &fr);
+	if (nf != 3)
+		goto out;
+	ft_peer_tx(ctx, &env.p, &fr[1]);
+
+	/* short CF2 with SN 2 which lacks bytes of the remaining 7 */
+	rx_tx(ctx, dl, 8, 0x22, pdu[13], pdu[14], pdu[15], pdu[16], pdu[17],
+	      pdu[18], pdu[19]);
+	/* the correct last CF2 */
+	ft_peer_tx(ctx, &env.p, &fr[2]);
+
+	n = ft_dut_recv(ctx, env.s, buf, sizeof(buf), 200);
+	if (n == 20 && !memcmp(buf, pdu, 20)) {
+		ft_log(ctx, "short CF with CAN_DL %d ignored (ISO behaviour)", dl);
+	} else {
+		FT_CHECK(ctx, n == -EILSEQ, "unexpected result %zd %s", n,
+			 n < 0 ? ft_errname(n) : "");
+		ft_note_dev(ctx, "short CF with CAN_DL %d accepted although bytes of the PDU were missing => following CF2 reported as EILSEQ",
+			    dl);
+	}
+	ft_dut_expect_noerr(ctx, env.s);
+out:
+	free(fr);
+	rxenv_close();
+}
+
 static void rx_cf_bs(struct ft_ctx *ctx, const void *param)
 {
 	static const uint8_t bss[] = { 1, 2, 3, 7, 15, 16, 255 };
@@ -1503,7 +1542,7 @@ static const char seg_ref[] =
 static const char lldl_req[] =
 	"The receiver accepts PDUs with any sender LL_DL (taken from the FF CAN_DL), independent of its own TX_DL: all CAN FD DLC lengths for CAN FD, any length >= 8 for CAN XL.";
 
-static const int dl0_0 = 0, dl0_1 = 1, dl0_2 = 2;
+static const int dl0_0 = 0, dl0_1 = 1, dl0_2 = 2, dl0_4 = 4;
 
 static const struct ft_test tests[] = {
 	SEG4("CC8"),
@@ -1690,6 +1729,15 @@ static const struct ft_test tests[] = {
 	  "Expected (ISO): a frame without N_PCI (CAN_DL 0) is ignored and the PDU completes. Observed behaviour is reported.",
 	  "protocolrx.c:isotp_rcv() / isotp_rcv_cf() no minimum CAN_DL check",
 	  "DEVIATION (if observed): a CAN_DL 0 frame is processed as (empty) CF and advances the SN (see test output)."),
+	T("RX-CF-014", "short last CF lacking bytes", 0, rx_cf_short_last,
+	  &dl0_4,
+	  "Only the last CF may be shorter than LL_DL and it has to contain all remaining bytes of the PDU. A short CF lacking bytes (here 3 of 7) is ignored and the reception continues with the correct CF.",
+	  "protocolrx.c:isotp_rcv_cf() last CF length check",
+	  "DEVIATION (if observed): the short CF is accepted, consumes a SN and the reception waits for further CFs (fixed by xl-isotp patch 32)."),
+	T("RX-CF-015", "CF with N_PCI only", 0, rx_cf_short_last, &dl0_1,
+	  "A CF with only the N_PCI (no data) is a short CF lacking bytes and is ignored; the reception continues with the correct CF.",
+	  "protocolrx.c:isotp_rcv_cf() last CF length check",
+	  "DEVIATION (if observed): the empty CF is accepted and consumes a SN (fixed by xl-isotp patch 32)."),
 	T("RX-CF-007-CC8", "block size handling CC8", 0, rx_cf_bs, NULL,
 	  "The receiver sends a FC after every BS CFs (BS 1..255).",
 	  "protocolrx.c:isotp_rcv_cf() so->rxfc.bs", NULL),

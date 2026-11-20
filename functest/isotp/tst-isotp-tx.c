@@ -457,7 +457,21 @@ static void tx_fc_short(struct ft_ctx *ctx, const void *param)
 		f.len = len;
 		ft_peer_tx(ctx, &env.p, &f);
 
-		if (len < ae + 3) {
+		if (len < ae + 1) {
+			/* no N_PCI => no N_PDU, expected to be ignored */
+			ft_sleep_ms(50);
+			if (ft_async_done(&env.a)) {
+				txenv_result(ctx, -EBADMSG);
+				ft_note_dev(ctx, "FC with CAN_DL %u (no N_PCI) processed with data beyond CAN_DL => EBADMSG",
+					    len);
+			} else {
+				ft_log(ctx, "FC without N_PCI ignored");
+				ft_peer_expect_none(ctx, &env.p, 10);
+				txenv_fc(ctx, FT_FS_CTS, 0, 0);
+				txenv_cfs(ctx, 1, env.n, NULL);
+				txenv_result(ctx, env.len);
+			}
+		} else if (len < ae + 3) {
 			txenv_result(ctx, -EBADMSG);
 			ft_peer_expect_none(ctx, &env.p, 20);
 		} else {
@@ -1256,12 +1270,14 @@ static const struct ft_test tests[] = {
 	  "protocolrx.c:isotp_rcv_fc() default case", NULL),
 	T("TX-FC-010-plain", "FC too short", 0, tx_fc_short,
 	  &((const struct fc_short_param){ FT_V_PLAIN }),
-	  "A FC with CAN_DL < 3 (+1 with extended addressing) aborts the transfer with EBADMSG. Data bytes beyond CAN_DL are not used.",
-	  "protocolrx.c:isotp_rcv_fc()", NULL),
+	  "A frame without N_PCI (CAN_DL < 1, +1 with extended addressing) is no N_PDU and is ignored. A FC with N_PCI and CAN_DL < 3 (+1 with extended addressing) aborts the transfer with EBADMSG. Data bytes beyond CAN_DL are not used.",
+	  "protocolrx.c:isotp_rcv() N_PCI length check, isotp_rcv_fc()",
+	  "DEVIATION (if observed): a FC without N_PCI is processed with data beyond CAN_DL (EBADMSG), fixed by xl-isotp patch 31."),
 	T("TX-FC-010-ae", "FC too short (ext. addressing)", 0, tx_fc_short,
 	  &((const struct fc_short_param){ FT_V_AE }),
-	  "A FC with CAN_DL < 3 (+1 with extended addressing) aborts the transfer with EBADMSG. Data bytes beyond CAN_DL are not used.",
-	  "protocolrx.c:isotp_rcv_fc()", NULL),
+	  "A frame without N_PCI (CAN_DL < 1, +1 with extended addressing) is no N_PDU and is ignored. A FC with N_PCI and CAN_DL < 3 (+1 with extended addressing) aborts the transfer with EBADMSG. Data bytes beyond CAN_DL are not used.",
+	  "protocolrx.c:isotp_rcv() N_PCI length check, isotp_rcv_fc()",
+	  "DEVIATION (if observed): a FC without N_PCI is processed with data beyond CAN_DL (EBADMSG), fixed by xl-isotp patch 31."),
 	T("TX-FC-011", "FC padding checks", 0, tx_fc_pad, NULL,
 	  "With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING rejects every FC. Failing FCs abort the transfer with EBADMSG.",
 	  "protocolrx.c:isotp_rcv_fc(), chk_pad_fail(), chk_optimized_fail()",
