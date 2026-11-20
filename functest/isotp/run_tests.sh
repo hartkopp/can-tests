@@ -65,6 +65,8 @@ fi
 	echo "max_pdu_size:  $(cat /sys/module/can_isotp/parameters/max_pdu_size 2>/dev/null || echo n/a)"
 	echo "rmem_max:      $(cat /proc/sys/net/core/rmem_max)"
 	echo "cpus:          $(nproc)"
+	echo "FT_IF_HW:      ${FT_IF_HW:-not set}"
+	[ -n "$FT_IF_HW" ] && ip -details -statistics link show "$FT_IF_HW"
 	echo
 	for i in vcaniso0 vcaniso1 vcaniso2 vcaniso3 vcaniso4 vcaniso5; do
 		echo "$i mtu $(cat /sys/class/net/$i/mtu) $(cat /sys/class/net/$i/operstate)"

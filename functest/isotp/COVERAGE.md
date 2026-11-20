@@ -139,7 +139,7 @@ paths that are not reachable with virtual CAN interfaces.
 | | not in WAIT_DATA | *n/c* (race) |
 | `isotp_tx_timeout()` | N_Bs timeout => ECOMM | TX-FC-006, TX-FC-016, TX-FC-017, TIM-NBS-*, API-IO-011 |
 | | IDLE / SHUTDOWN / state changed | *n/c* (race) |
-| `isotp_echo_timer_handler()` | missing local echo => ECOMM | *n/c* (the local echo always arrives on vcan) |
+| `isotp_echo_timer_handler()` | missing local echo => ECOMM | TIM-ECHO-001..003 (only with a real CAN interface, `FT_IF_HW`) |
 | `isotp_txfr_timer_handler()` | send next CF after tx_gap | TIM-STM-*, TIM-BC-* |
 
 ## isotp.c

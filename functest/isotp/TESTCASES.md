@@ -1170,3 +1170,36 @@ Parameterized test cases with the same behaviour are grouped.
 - **Code:** protocolrx.c:isotp_rcv_ff() hrtimer_start(rxtimer)
 - **Flags:** slow timing
 
+### TIM-ECHO-001
+
+**echo timeout SF (WAIT_TX_DONE)**
+
+- **Behaviour:** Real CAN interface (FT_IF_HW) without bus partner: when the local echo of a SF does not arrive, the transfer is aborted after 2 s + frame_txtime and send() with CAN_ISOTP_WAIT_TX_DONE returns ECOMM; the socket error is cleared and the socket is idle again.
+- **Code:** protocoltx.c:isotp_sendmsg() echotimer, hrtimer.c:isotp_echo_timer_handler(), isotp_tx_timeout()
+- **Flags:** slow timing
+
+### TIM-ECHO-002
+
+**echo timeout SF (asynchronous)**
+
+- **Behaviour:** Real CAN interface (FT_IF_HW) without bus partner: without CAN_ISOTP_WAIT_TX_DONE send() returns immediately; while waiting for the echo the socket is not writable and further send() calls fail with EAGAIN (MSG_DONTWAIT). After 2 s + frame_txtime the socket error ECOMM is reported and the socket is idle again.
+- **Code:** protocoltx.c:isotp_sendmsg() echotimer, hrtimer.c:isotp_echo_timer_handler()
+- **Flags:** slow timing
+
+### TIM-ECHO-003
+
+**echo timeout CF broadcast FF**
+
+- **Behaviour:** Real CAN interface (FT_IF_HW) without bus partner: in CF broadcast mode the echo of the FF is monitored; without echo the transfer is aborted after 2 s + frame_txtime with ECOMM.
+- **Code:** protocoltx.c:isotp_sendmsg() CF broadcast cfecho, hrtimer.c:isotp_echo_timer_handler()
+- **Flags:** slow timing
+
+### TIM-ECHO-004
+
+**FF without echo (N_Bs)**
+
+- **Behaviour:** Real CAN interface (FT_IF_HW) without bus partner: the echo of a FF (with FC) is not monitored, the transfer is aborted by the N_Bs timeout after 1 s + frame_txtime with ECOMM.
+- **Code:** protocoltx.c:isotp_sendmsg() txtimer for ISOTP_WAIT_FIRST_FC
+- **ISO 15765-2:** REVIEW: N_As (missing transmission confirmation) is monitored with 2 s for SF/CF and covered by N_Bs (1 s) for the FF.
+- **Flags:** slow timing
+

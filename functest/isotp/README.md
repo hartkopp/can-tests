@@ -68,6 +68,26 @@ Other interface names can be given with the environment variables
 `FT_IF_CC`, `FT_IF_FD`, `FT_IF_XL`, `FT_IF_XL512`, `FT_IF_XL256` and
 `FT_IF_DOWN`. Test cases for missing interfaces are skipped.
 
+### Optional real CAN interface (echo timeout)
+
+The local echo of virtual CAN interfaces always arrives, so the echo
+timeout (2 s, `ISOTP_ECHO_TIMEOUT`) can only be tested with a real CAN
+interface. The test cases `TIM-ECHO-*` (timing suite) run when
+`FT_IF_HW` names such an interface:
+
+- the interface is configured (bitrate) and up, its driver supports
+  `IFF_ECHO` (echo after successful transmission),
+- **no other node is connected** (or the bus is not terminated), so the
+  frames are never acknowledged.
+
+```bash
+FT_IF_HW=can0 ./run_tests.sh -s timing -t 'TIM-ECHO-*'
+```
+
+The unacknowledged frames stay pending in the CAN controller / tx queue.
+Restart the interface afterwards (as root: `ip link set can0 down` and
+`ip link set can0 up`) before using it for other purposes.
+
 `setup_vcan.sh -r` raises `net.core.rmem_max` to 8 MByte. The CAN_RAW
 peer records all frames in a background thread; a larger receive buffer
 avoids frame drops on slow or loaded systems (drops are detected via
