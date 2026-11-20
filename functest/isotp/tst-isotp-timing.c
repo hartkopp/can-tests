@@ -13,6 +13,7 @@
 
 #define _GNU_SOURCE
 #include <errno.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -23,6 +24,9 @@
 
 #define US 1000LL
 #define MS 1000000LL
+
+#define TXT_ZERO CAN_ISOTP_FRAME_TXTIME_ZERO
+#define TXT_DEF (FT_DEF_FRAME_TXTIME * 1LL)
 
 /* slack for the lower bound: timestamp of the frame vs. timer start */
 #define LOW_SLACK (30 * US)
@@ -290,6 +294,92 @@ out:
 }
 
 /* ------------------------------------------------------------------------
+ * local echo timeout (real CAN interface without bus partner)
+ *
+ * Without a second node on the bus the CAN frame is never acknowledged
+ * and the controller retries it. The local echo (IFF_ECHO) only comes
+ * after a successful transmission and therefore never arrives.
+ * ------------------------------------------------------------------------
+ */
+
+static void tim_echo(struct ft_ctx *ctx, const void *param)
+{
+	const char *what = param;
+	struct ft_isotp_cfg c;
+	struct pollfd pfd;
+	static uint8_t data[100];
+	int64_t t0, t_err = 0, expect = 2000 * MS + TXT_DEF;
+	unsigned int len = 5;
+	ssize_t n;
+	int s;
+
+	if (!ft_need_hw(ctx))
+		return;
+
+	ft_cfg_init(&c);
+	c.iface = FT_IF_HW;
+	if (!strcmp(what, "wtd"))
+		c.opts.flags |= CAN_ISOTP_WAIT_TX_DONE;
+	if (!strcmp(what, "cfbc")) {
+		c.opts.flags |= CAN_ISOTP_CF_BROADCAST;
+		len = 20;
+	}
+	if (!strcmp(what, "ff")) {
+		/* FF echo is not monitored: N_Bs (FC timeout) applies */
+		len = 20;
+		expect = 1000 * MS + TXT_DEF;
+	}
+
+	s = ft_isotp_open(ctx, &c);
+	FT_BAIL(ctx);
+
+	ft_pattern(data, len, 0x5A);
+	t0 = ft_now_ns();
+	n = ft_dut_send(ctx, s, data, len, 0);
+
+	if (!strcmp(what, "wtd")) {
+		/* send() returns the result after the echo timeout */
+		t_err = ft_now_ns();
+		FT_CHECK(ctx, n == -ECOMM,
+			 "send() returned %zd %s (another node on the bus?)", n,
+			 n < 0 ? ft_errname(n) : "");
+		ft_dut_expect_noerr(ctx, s);
+	} else {
+		if (!FT_CHECK(ctx, n == (ssize_t)len, "send() %zd %s", n,
+			      n < 0 ? ft_errname(n) : ""))
+			goto out;
+
+		/* the transfer is active: not writable */
+		ft_sleep_ms(100);
+		pfd.fd = s;
+		pfd.events = POLLOUT;
+		pfd.revents = 0;
+		FT_CHECK(ctx, poll(&pfd, 1, 0) == 0,
+			 "POLLOUT while waiting for the echo (revents %X, another node on the bus?)",
+			 pfd.revents);
+
+		/* a second PDU can not be sent */
+		n = ft_dut_send(ctx, s, data, 3, MSG_DONTWAIT);
+		FT_CHECK(ctx, n == -EAGAIN, "2nd send(): %s", ft_errname(n));
+
+		ft_dut_expect_err(ctx, s, ECOMM, 4000, &t_err);
+	}
+
+	if (t_err)
+		check_timeout(ctx, t0, t_err, expect);
+
+	/* the socket is idle again */
+	pfd.fd = s;
+	pfd.events = POLLOUT;
+	pfd.revents = 0;
+	FT_CHECK(ctx, poll(&pfd, 1, 0) == 1 && (pfd.revents & POLLOUT),
+		 "socket not writable after the timeout (revents %X)",
+		 pfd.revents);
+out:
+	close(s);
+}
+
+/* ------------------------------------------------------------------------
  * test table
  * ------------------------------------------------------------------------
  */
@@ -297,9 +387,6 @@ out:
 #define T(i, t, fl, f, p, rq, rf, is)					\
 	{ .id = i, .title = t, .req = rq, .ref = rf, .iso = is,		\
 	  .flags = fl, .fn = f, .param = p }
-
-#define TXT_ZERO CAN_ISOTP_FRAME_TXTIME_ZERO
-#define TXT_DEF (FT_DEF_FRAME_TXTIME * 1LL)
 
 static const char stm_req[] =
 	"The gap between consecutive frames is frame_txtime (N_As, default 50 us) + STmin from the first FC: 0x00..0x7F => 0..127 ms, 0xF1..0xF9 => 100..900 us, reserved values (0x80..0xF0, 0xFA..0xFF) => 127 ms. With CAN_ISOTP_FORCE_TXSTMIN the CAN_ISOTP_TX_STMIN value (ns) replaces the FC STmin. Without any gap the CFs are sent in burst mode (no timer).";
@@ -399,6 +486,24 @@ static const struct ft_test tests[] = {
 	  &((const struct to_param){ "listen", 100 * MS, 1000 * MS }),
 	  "In listen mode the CF timeout after the FF is 1 s without frame_txtime (ETIMEDOUT).",
 	  "protocolrx.c:isotp_rcv_ff() hrtimer_start(rxtimer)", NULL),
+
+	T("TIM-ECHO-001", "echo timeout SF (WAIT_TX_DONE)", FT_SLOW | FT_TIMING,
+	  tim_echo, "wtd",
+	  "Real CAN interface (FT_IF_HW) without bus partner: when the local echo of a SF does not arrive, the transfer is aborted after 2 s + frame_txtime and send() with CAN_ISOTP_WAIT_TX_DONE returns ECOMM; the socket error is cleared and the socket is idle again.",
+	  "protocoltx.c:isotp_sendmsg() echotimer, hrtimer.c:isotp_echo_timer_handler(), isotp_tx_timeout()", NULL),
+	T("TIM-ECHO-002", "echo timeout SF (asynchronous)", FT_SLOW | FT_TIMING,
+	  tim_echo, "async",
+	  "Real CAN interface (FT_IF_HW) without bus partner: without CAN_ISOTP_WAIT_TX_DONE send() returns immediately; while waiting for the echo the socket is not writable and further send() calls fail with EAGAIN (MSG_DONTWAIT). After 2 s + frame_txtime the socket error ECOMM is reported and the socket is idle again.",
+	  "protocoltx.c:isotp_sendmsg() echotimer, hrtimer.c:isotp_echo_timer_handler()", NULL),
+	T("TIM-ECHO-003", "echo timeout CF broadcast FF", FT_SLOW | FT_TIMING,
+	  tim_echo, "cfbc",
+	  "Real CAN interface (FT_IF_HW) without bus partner: in CF broadcast mode the echo of the FF is monitored; without echo the transfer is aborted after 2 s + frame_txtime with ECOMM.",
+	  "protocoltx.c:isotp_sendmsg() CF broadcast cfecho, hrtimer.c:isotp_echo_timer_handler()", NULL),
+	T("TIM-ECHO-004", "FF without echo (N_Bs)", FT_SLOW | FT_TIMING,
+	  tim_echo, "ff",
+	  "Real CAN interface (FT_IF_HW) without bus partner: the echo of a FF (with FC) is not monitored, the transfer is aborted by the N_Bs timeout after 1 s + frame_txtime with ECOMM.",
+	  "protocoltx.c:isotp_sendmsg() txtimer for ISOTP_WAIT_FIRST_FC",
+	  "REVIEW: N_As (missing transmission confirmation) is monitored with 2 s for SF/CF and covered by N_Bs (1 s) for the FF."),
 };
 
 int main(int argc, char **argv)
