@@ -691,9 +691,9 @@ Parameterized test cases with the same behaviour are grouped.
 **FF_DL minimum CC8**
 
 - **Variants:** `RX-FF-004-CC8`, `RX-FF-004-CC8-ae`, `RX-FF-004-FD64`, `RX-FF-004-XL9-2048`
-- **Behaviour:** A FF whose FF_DL fits into the FF itself (FF_DL + PCI + AE <= CAN_DL) is ignored. The smallest accepted FF_DL needs one CF.
-- **Code:** protocolrx.c:isotp_rcv_ff() 'single FF's are not allowed'
-- **ISO 15765-2:** DEVIATION: CAN CC FF_DL 7 (normal) / 6 (extended addressing) is accepted although it fits into a SF (ISO 15765-2 FF_DLmin 8 / 7).
+- **Behaviour:** A FF with FF_DL < FF_DLmin (the PDU fits into a SF of the sender LL_DL: 7-ae for LL_DL 8, LL_DL-2-ae else) is ignored, FF_DL >= FF_DLmin is answered with a FC.
+- **Code:** protocolrx.c:isotp_rcv_ff() FF_DLmin check
+- **ISO 15765-2:** DEVIATION (if observed): CAN CC FF_DL 7 (normal) / 6 (extended addressing) is accepted although it fits into a SF (ISO 15765-2 FF_DLmin 8 / 7), fixed by xl-isotp patch 33.
 
 ### RX-FF-005
 
