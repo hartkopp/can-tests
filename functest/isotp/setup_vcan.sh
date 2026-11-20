@@ -12,11 +12,11 @@
 #   -r      also raise net.core.rmem_max to 8 MByte (recommended: the
 #           CAN_RAW peer of the test suite records long frame bursts)
 #   -e      echo mode: (re)load the vcan module with echo=1 and create
-#           the additional interfaces vcaniso6..8 with netem qdiscs for
+#           the additional interfaces vcaniso6..9 with netem/tbf qdiscs for
 #           the echo timeout tests. The vcan module parameter applies to
 #           all vcan interfaces: the module is only reloaded when no other
 #           vcan interfaces than vcaniso* exist (-f forces the reload and
-#           removes all vcan interfaces). Needs sch_netem / tc.
+#           removes all vcan interfaces). Needs sch_netem, sch_tbf, tc.
 #
 # Interfaces (names do not collide with existing vcanX interfaces):
 #
@@ -32,12 +32,16 @@
 #   vcaniso6  MTU 16    netem loss 100%   => echo never arrives
 #   vcaniso7  MTU 16    netem delay 3000ms => echo after the 2 s timeout
 #   vcaniso8  MTU 16    netem delay 100ms  => slow tx confirmation
+#   vcaniso9  MTU 16    tbf rate 2kbit     => slow bus (64 ms per CC frame)
+#
+# netem orphans the skbs when a delay is configured (see TIM-ECHO-006/007),
+# tbf keeps the socket reference of the skbs.
 #
 # The test suite itself runs without root privileges.
 
 IFACES="vcaniso0:16:up vcaniso1:72:up vcaniso2:2060:up vcaniso3:524:up vcaniso4:268:up vcaniso5:16:down"
 
-ECHO_IFACES="vcaniso6:16:up:loss_100% vcaniso7:16:up:delay_3000ms vcaniso8:16:up:delay_100ms"
+ECHO_IFACES="vcaniso6:16:up:netem_loss_100% vcaniso7:16:up:netem_delay_3000ms vcaniso8:16:up:netem_delay_100ms vcaniso9:16:up:tbf_rate_2kbit_burst_20b_limit_1000"
 
 RMEM=0
 ECHO=0
@@ -101,7 +105,7 @@ case "$CMD" in
 up)
 	[ $ECHO = 1 ] && load_vcan_echo
 
-	for m in can can_raw can_bcm can_isotp vcan sch_netem; do
+	for m in can can_raw can_bcm can_isotp vcan sch_netem sch_tbf; do
 		modprobe $m 2>/dev/null || \
 			echo "note: modprobe $m failed (built-in?)"
 	done
@@ -130,7 +134,7 @@ up)
 			name=${e%%:*}
 			rest=${e#*:}
 			mtu=${rest%%:*}
-			netem=$(echo "${rest##*:}" | tr '_' ' ')
+			qdisc=$(echo "${rest##*:}" | tr '_' ' ')
 
 			if [ ! -e /sys/class/net/$name ]; then
 				ip link add dev $name type vcan || \
@@ -140,8 +144,8 @@ up)
 			ip link set dev $name mtu $mtu
 			ip link set dev $name up || die "can not set $name up"
 			# shellcheck disable=SC2086
-			tc qdisc replace dev $name root netem $netem || \
-				die "can not set netem $netem on $name"
+			tc qdisc replace dev $name root $qdisc || \
+				die "can not set qdisc $qdisc on $name"
 		done
 	fi
 

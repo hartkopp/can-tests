@@ -435,6 +435,7 @@ static void tim_echo_late(struct ft_ctx *ctx, const void *param)
  * transmission confirmation which paces the transfer
  */
 struct slow_param {
+	enum ft_if iface;	/* FT_IF_ESLOW (netem) or FT_IF_ERATE (tbf) */
 	uint8_t stmin;
 	uint32_t bcflag;
 	int64_t gap;		/* expected gap between the frames */
@@ -453,11 +454,11 @@ static void tim_echo_slow(struct ft_ctx *ctx, const void *param)
 	unsigned int len = 6 + 3 * 7; /* FF + 3 CFs */
 	int s, i;
 
-	if (!ft_need_echo_if(ctx, FT_IF_ESLOW))
+	if (!ft_need_echo_if(ctx, sp->iface))
 		return;
 
 	ft_cfg_init(&c);
-	c.iface = FT_IF_ESLOW;
+	c.iface = sp->iface;
 	c.opts.flags |= CAN_ISOTP_WAIT_TX_DONE | sp->bcflag;
 	s = ft_isotp_open(ctx, &c);
 	FT_BAIL(ctx);
@@ -475,8 +476,9 @@ static void tim_echo_slow(struct ft_ctx *ctx, const void *param)
 	FT_CHECK(ctx, ft_dut_send(ctx, s, data, 5, 0) == 5, "SF send()");
 	ft_log(ctx, "SF send() returned after %lld us",
 	       (long long)(ft_now_ns() - t0) / 1000);
-	FT_CHECK(ctx, ft_now_ns() - t0 >= 100 * MS - LOW_SLACK,
-		 "SF send() returned before the (delayed) echo");
+	if (sp->iface == FT_IF_ESLOW)
+		FT_CHECK(ctx, ft_now_ns() - t0 >= 100 * MS - LOW_SLACK,
+			 "SF send() returned before the (delayed) echo");
 	ft_peer_next(ctx, &p, &f, 500);
 
 	/* segmented PDU: the peer sees the frames after the qdisc delay */
@@ -492,8 +494,15 @@ static void tim_echo_slow(struct ft_ctx *ctx, const void *param)
 		ft_peer_tx(ctx, &p, &fc);
 	}
 	for (i = 1; i <= 3; i++) {
-		if (!ft_peer_next(ctx, &p, &f, 2000)) {
-			ft_fail(ctx, "CF %d missing", i);
+		if (!ft_peer_next(ctx, &p, &f, 1000)) {
+			ft_async_join(ctx, &a, 3000);
+			if (sp->iface == FT_IF_ESLOW && i > 1 && a.ret == -ECOMM) {
+				ft_note_finding(ctx, "CF %d not sent, transfer aborted with ECOMM: the echo of CF %d was not recognized. netem (delay) orphans skbs without sock_wfree destructor (skb_orphan_partial()); the CF skbs are created with alloc_skb() + can_skb_set_owner() (sock_efree) and lose skb->sk, so isotp_rcv_echo() drops the echo (skb->sk != sk). SF/FF skbs from sock_alloc_send_skb() keep skb->sk.",
+						i, i - 1);
+			} else {
+				ft_fail(ctx, "CF %d missing (send() %zd %s)", i,
+					a.ret, a.ret < 0 ? ft_errname(a.ret) : "");
+			}
 			goto out;
 		}
 		FT_CHECK(ctx, f.data[0] == (0x20 | i), "CF %d N_PCI %02X", i,
@@ -505,7 +514,10 @@ static void tim_echo_slow(struct ft_ctx *ctx, const void *param)
 			 a.ret < 0 ? ft_errname(a.ret) : "");
 
 	/* the gap between the CFs starts with the echo of the previous CF */
-	for (i = sp->bcflag ? 1 : 2; i <= 3; i++) {
+	/* tbf: the token bucket is not empty after an idle phase, so the
+	 * gap FF -> CF1 can be shorter than the frame time
+	 */
+	for (i = (sp->bcflag && sp->iface != FT_IF_ERATE) ? 1 : 2; i <= 3; i++) {
 		int64_t d = ts[i] - ts[i - 1];
 
 		ft_log(ctx, "gap %d: %lld us (expected %lld us)", i,
@@ -655,16 +667,33 @@ static const struct ft_test tests[] = {
 	  tim_echo_late, NULL,
 	  "vcan with echo=1 and netem delay 3000ms (setup_vcan.sh -e): a SF whose echo arrives after 3 s is aborted after 2 s + frame_txtime with ECOMM. The late echo arriving during the next SF transfer does not complete that transfer (echo identified by the skb uid), which is aborted with ECOMM as well.",
 	  "protocoltx.c:isotp_rcv_echo() cfecho / can_skb_uid check", NULL),
-	T("TIM-ECHO-006", "slow echo paces CFs (STmin 10 ms)", FT_TIMING,
+	T("TIM-ECHO-006", "netem delayed echo (STmin 10 ms)", FT_TIMING,
 	  tim_echo_slow,
-	  &((const struct slow_param){ 0x0A, 0, 100 * MS + 10 * MS + TXT_DEF }),
-	  "vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): a SF send() with WAIT_TX_DONE returns after the delayed echo. The separation time between CFs (STmin + frame_txtime) starts at the echo (transmission confirmation) of the previous CF: gap = echo delay + STmin + frame_txtime.",
-	  "protocoltx.c:isotp_rcv_echo() txfrtimer start", NULL),
-	T("TIM-ECHO-007", "slow echo paces CF broadcast", FT_TIMING,
+	  &((const struct slow_param){ FT_IF_ESLOW, 0x0A, 0, 100 * MS + 10 * MS + TXT_DEF }),
+	  "vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): a SF send() with WAIT_TX_DONE returns after the delayed echo. Expected: the separation time between CFs (STmin + frame_txtime) starts at the echo of the previous CF (gap = echo delay + STmin + frame_txtime). Observed behaviour is reported.",
+	  "protocoltx.c:isotp_send_cframe() alloc_skb()/can_skb_set_owner(), isotp_rcv_echo() skb->sk check, sch_netem.c:netem_enqueue() skb_orphan_partial()",
+	  "FINDING (if observed): netem with delay orphans the CF skbs (sock_efree destructor), the CF echo is not recognized and the transfer is aborted with ECOMM."),
+	T("TIM-ECHO-007", "netem delayed echo (CF broadcast)", FT_TIMING,
 	  tim_echo_slow,
-	  &((const struct slow_param){ 0, CAN_ISOTP_CF_BROADCAST, 100 * MS + TXT_DEF }),
-	  "vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): in CF broadcast mode each frame (incl. the FF) is sent after the echo of the previous frame + frame_txtime.",
+	  &((const struct slow_param){ FT_IF_ESLOW, 0, CAN_ISOTP_CF_BROADCAST, 100 * MS + TXT_DEF }),
+	  "vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): expected: in CF broadcast mode each frame (incl. the FF) is sent after the echo of the previous frame + frame_txtime. Observed behaviour is reported.",
+	  "protocoltx.c:isotp_send_cframe() alloc_skb()/can_skb_set_owner(), isotp_rcv_echo() skb->sk check, sch_netem.c:netem_enqueue() skb_orphan_partial()",
+	  "FINDING (if observed): netem with delay orphans the CF skbs (sock_efree destructor), the CF echo is not recognized and the transfer is aborted with ECOMM."),
+	T("TIM-ECHO-008", "slow bus paces CFs (tbf, STmin 0)", FT_TIMING,
+	  tim_echo_slow,
+	  &((const struct slow_param){ FT_IF_ERATE, 0x00, 0, 64 * MS }),
+	  "vcan with echo=1 and tbf rate 2kbit (setup_vcan.sh -e, 64 ms per CAN CC frame): the transfer completes and the CFs are paced by the transmission confirmation (echo): gap = max(frame time, STmin + frame_txtime) = 64 ms.",
+	  "protocoltx.c:isotp_rcv_echo()", NULL),
+	T("TIM-ECHO-009", "slow bus paces CFs (tbf, STmin 100 ms)", FT_TIMING,
+	  tim_echo_slow,
+	  &((const struct slow_param){ FT_IF_ERATE, 0x64, 0, 100 * MS + TXT_DEF }),
+	  "vcan with echo=1 and tbf rate 2kbit (setup_vcan.sh -e, 64 ms per CAN CC frame): with STmin 100 ms > frame time the gap between CFs is STmin + frame_txtime, measured from the echo of the previous CF.",
 	  "protocoltx.c:isotp_rcv_echo() txfrtimer start", NULL),
+	T("TIM-ECHO-010", "slow bus paces CF broadcast (tbf)", FT_TIMING,
+	  tim_echo_slow,
+	  &((const struct slow_param){ FT_IF_ERATE, 0, CAN_ISOTP_CF_BROADCAST, 64 * MS }),
+	  "vcan with echo=1 and tbf rate 2kbit (setup_vcan.sh -e, 64 ms per CAN CC frame): in CF broadcast mode the CFs are paced by the transmission confirmation (gap between the CFs = frame time).",
+	  "protocoltx.c:isotp_rcv_echo()", NULL),
 };
 
 int main(int argc, char **argv)

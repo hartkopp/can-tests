@@ -49,6 +49,7 @@ struct ft_config ft_cfg = {
 		[FT_IF_ELOSS] = "vcaniso6",
 		[FT_IF_EDELAY] = "vcaniso7",
 		[FT_IF_ESLOW] = "vcaniso8",
+		[FT_IF_ERATE] = "vcaniso9",
 		[FT_IF_HW] = "",	/* only via environment variable */
 	},
 	.verbose = 0,
@@ -67,6 +68,7 @@ static const char *ft_if_env[FT_IF_MAX] = {
 	[FT_IF_ELOSS] = "FT_IF_ELOSS",
 	[FT_IF_EDELAY] = "FT_IF_EDELAY",
 	[FT_IF_ESLOW] = "FT_IF_ESLOW",
+	[FT_IF_ERATE] = "FT_IF_ERATE",
 	[FT_IF_HW] = "FT_IF_HW",
 };
 
@@ -130,6 +132,16 @@ void ft_note_dev(struct ft_ctx *ctx, const char *fmt, ...)
 	ft_vlog(ctx, "DEVIATION: ", fmt, ap);
 	va_end(ap);
 	ctx->ndev++;
+}
+
+void ft_note_finding(struct ft_ctx *ctx, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	ft_vlog(ctx, "FINDING: ", fmt, ap);
+	va_end(ap);
+	ctx->nfind++;
 }
 
 static void ft_log_frame(struct ft_ctx *ctx, const char *pfx,
@@ -1770,14 +1782,14 @@ static void ft_usage(const char *prg, const char *suite)
 		"Interfaces (environment variables, default):\n"
 		"  FT_IF_CC (%s) FT_IF_FD (%s) FT_IF_XL (%s)\n"
 		"  FT_IF_XL512 (%s) FT_IF_XL256 (%s) FT_IF_DOWN (%s)\n"
-		"  FT_IF_ELOSS (%s) FT_IF_EDELAY (%s) FT_IF_ESLOW (%s)\n"
+		"  FT_IF_ELOSS (%s) FT_IF_EDELAY (%s) FT_IF_ESLOW (%s) FT_IF_ERATE (%s)\n"
 		"  FT_IF_HW (optional real CAN interface without bus partner)\n",
 		prg, suite, prg, ft_cfg.tol_ms, ft_cfg.watchdog_s,
 		ft_cfg.ifname[FT_IF_CC], ft_cfg.ifname[FT_IF_FD],
 		ft_cfg.ifname[FT_IF_XL], ft_cfg.ifname[FT_IF_XL512],
 		ft_cfg.ifname[FT_IF_XL256], ft_cfg.ifname[FT_IF_DOWN],
 		ft_cfg.ifname[FT_IF_ELOSS], ft_cfg.ifname[FT_IF_EDELAY],
-		ft_cfg.ifname[FT_IF_ESLOW]);
+		ft_cfg.ifname[FT_IF_ESLOW], ft_cfg.ifname[FT_IF_ERATE]);
 }
 
 static bool ft_match(const char *list, const char *id)
@@ -1876,6 +1888,8 @@ static int ft_run_one(const struct ft_test *t)
 		ret = 2;
 	else if (ctx.ndev)
 		ret = 3;
+	else if (ctx.nfind)
+		ret = 4;
 	else
 		ret = 0;
 
@@ -1892,7 +1906,7 @@ int ft_main(int argc, char **argv, const char *suite,
 {
 	const char *incl = NULL, *excl = NULL;
 	int opt, i, num = 0;
-	int npass = 0, nfail = 0, nskip = 0, ndev = 0, nrev = 0;
+	int npass = 0, nfail = 0, nskip = 0, ndev = 0, nrev = 0, nfind = 0;
 	int list = 0, md = 0;
 	int64_t t0 = ft_now_ns();
 
@@ -1961,12 +1975,12 @@ int ft_main(int argc, char **argv, const char *suite,
 
 	printf("# CAN_ISOTP functional test suite: %s\n", suite);
 	printf("# interfaces: CC %s FD %s XL %s XL512 %s XL256 %s DOWN %s\n"
-	       "# echo interfaces: LOSS %s DELAY %s SLOW %s HW %s\n",
+	       "# echo interfaces: LOSS %s DELAY %s SLOW %s RATE %s HW %s\n",
 	       ft_cfg.ifname[FT_IF_CC], ft_cfg.ifname[FT_IF_FD],
 	       ft_cfg.ifname[FT_IF_XL], ft_cfg.ifname[FT_IF_XL512],
 	       ft_cfg.ifname[FT_IF_XL256], ft_cfg.ifname[FT_IF_DOWN],
 	       ft_cfg.ifname[FT_IF_ELOSS], ft_cfg.ifname[FT_IF_EDELAY],
-	       ft_cfg.ifname[FT_IF_ESLOW],
+	       ft_cfg.ifname[FT_IF_ESLOW], ft_cfg.ifname[FT_IF_ERATE],
 	       *ft_cfg.ifname[FT_IF_HW] ? ft_cfg.ifname[FT_IF_HW] : "-");
 	printf("# timing tolerance %d ms%s\n", ft_cfg.tol_ms,
 	       ft_cfg.quick ? ", quick mode" : "");
@@ -2025,8 +2039,9 @@ int ft_main(int argc, char **argv, const char *suite,
 		else
 			ret = -1;
 
-		/* "DEVIATION (if observed)": only reported dynamically */
-		if (t->iso && !strncmp(t->iso, "DEVIATION (if observed)", 23))
+		/* "DEVIATION/FINDING (if observed)": only reported dynamically */
+		if (t->iso && (strstr(t->iso, "(if observed)") ||
+			       !strncmp(t->iso, "FINDING", 7)))
 			note = "";
 		else if (t->iso && !strncmp(t->iso, "DEVIATION", 9))
 			note = " # DEVIATION";
@@ -2036,11 +2051,16 @@ int ft_main(int argc, char **argv, const char *suite,
 		switch (ret) {
 		case 0:
 		case 3:
+		case 4:
 			if (ret == 3)
 				note = " # DEVIATION";
+			if (ret == 4)
+				note = " # FINDING";
 			printf("ok %d - %s %s%s\n", num, t->id, t->title, note);
 			npass++;
-			if (*note == ' ' && note[3] == 'D')
+			if (ret == 4)
+				nfind++;
+			else if (*note == ' ' && note[3] == 'D')
 				ndev++;
 			else if (*note)
 				nrev++;
@@ -2069,8 +2089,8 @@ int ft_main(int argc, char **argv, const char *suite,
 			       (long long)(ft_now_ns() - ts) / 1000000);
 	}
 
-	printf("# %s: %d tests, %d passed (%d with DEVIATION, %d with REVIEW note), %d failed, %d skipped, %lld s\n",
-	       suite, num, npass, ndev, nrev, nfail, nskip,
+	printf("# %s: %d tests, %d passed (%d with DEVIATION, %d with REVIEW note, %d with FINDING), %d failed, %d skipped, %lld s\n",
+	       suite, num, npass, ndev, nrev, nfind, nfail, nskip,
 	       (long long)(ft_now_ns() - t0) / 1000000000);
 
 	return nfail ? 1 : 0;
