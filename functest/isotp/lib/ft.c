@@ -425,7 +425,23 @@ static void *ft_peer_thread(void *arg)
 			}
 		}
 
-		if (n == CAN_MTU) {
+		/* CAN XL frames are identified by CANXL_XLF in the flags
+		 * (CAN CC/FD len byte at that offset is always <= 64)
+		 */
+		if (n >= (ssize_t)(CANXL_HDR_SIZE + CANXL_MIN_DLEN) &&
+		    (((struct canxl_frame *)buf)->flags & CANXL_XLF)) {
+			struct canxl_frame *cxl = (struct canxl_frame *)buf;
+
+			f->type = FT_XL;
+			f->id = cxl->prio;
+			f->flags = cxl->flags;
+			f->sdt = cxl->sdt;
+			f->af = cxl->af;
+			f->len = cxl->len;
+			if (f->len > CANXL_MAX_DLEN)
+				f->len = CANXL_MAX_DLEN;
+			memcpy(f->data, cxl->data, f->len);
+		} else if (n == CAN_MTU) {
 			struct can_frame *cf = (struct can_frame *)buf;
 
 			f->type = FT_CC;
@@ -440,18 +456,6 @@ static void *ft_peer_thread(void *arg)
 			f->flags = cfd->flags;
 			f->len = cfd->len;
 			memcpy(f->data, cfd->data, CANFD_MAX_DLEN);
-		} else if (n >= (ssize_t)CANXL_HDR_SIZE + CANXL_MIN_DLEN) {
-			struct canxl_frame *cxl = (struct canxl_frame *)buf;
-
-			f->type = FT_XL;
-			f->id = cxl->prio;
-			f->flags = cxl->flags;
-			f->sdt = cxl->sdt;
-			f->af = cxl->af;
-			f->len = cxl->len;
-			if (f->len > CANXL_MAX_DLEN)
-				f->len = CANXL_MAX_DLEN;
-			memcpy(f->data, cxl->data, f->len);
 		} else {
 			continue;
 		}

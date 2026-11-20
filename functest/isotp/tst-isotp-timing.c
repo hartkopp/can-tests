@@ -134,7 +134,8 @@ static void tim_stmin(struct ft_ctx *ctx, const void *param)
 			 ft_cfg.tol_ms);
 	}
 out:
-	ft_async_join(ctx, &a, 4000);
+	if (a.started)
+		ft_async_join(ctx, &a, 4000);
 	ft_peer_close(&p);
 	close(s);
 }
