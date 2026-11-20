@@ -450,7 +450,7 @@ static void tim_echo_slow(struct ft_ctx *ctx, const void *param)
 	struct ft_frame hrx, fc, f;
 	struct ft_async a;
 	static uint8_t data[100];
-	int64_t ts[8], t0;
+	int64_t ts[8], t0, slack;
 	unsigned int len = 6 + 3 * 7; /* FF + 3 CFs */
 	int s, i;
 
@@ -514,6 +514,11 @@ static void tim_echo_slow(struct ft_ctx *ctx, const void *param)
 			 a.ret < 0 ? ft_errname(a.ret) : "");
 
 	/* the gap between the CFs starts with the echo of the previous CF */
+	/* tbf paces the frames by its token bucket (not by an isotp hrtimer)
+	 * with some imprecision => 1 ms slack for the lower bound
+	 */
+	slack = (sp->iface == FT_IF_ERATE) ? 1 * MS : LOW_SLACK;
+
 	/* tbf: the token bucket is not empty after an idle phase, so the
 	 * gap FF -> CF1 can be shorter than the frame time
 	 */
@@ -522,7 +527,7 @@ static void tim_echo_slow(struct ft_ctx *ctx, const void *param)
 
 		ft_log(ctx, "gap %d: %lld us (expected %lld us)", i,
 		       (long long)d / 1000, (long long)sp->gap / 1000);
-		FT_CHECK(ctx, d >= sp->gap - LOW_SLACK &&
+		FT_CHECK(ctx, d >= sp->gap - slack &&
 			 d <= sp->gap + ft_cfg.tol_ms * MS,
 			 "gap %d: %lld us, expected %lld us", i,
 			 (long long)d / 1000, (long long)sp->gap / 1000);
