@@ -381,8 +381,9 @@ Parameterized test cases with the same behaviour are grouped.
 **FC too short**
 
 - **Variants:** `TX-FC-010-plain`, `TX-FC-010-ae`
-- **Behaviour:** A FC with CAN_DL < 3 (+1 with extended addressing) aborts the transfer with EBADMSG. Data bytes beyond CAN_DL are not used.
-- **Code:** protocolrx.c:isotp_rcv_fc()
+- **Behaviour:** A frame without N_PCI (CAN_DL < 1, +1 with extended addressing) is no N_PDU and is ignored. A FC with N_PCI and CAN_DL < 3 (+1 with extended addressing) aborts the transfer with EBADMSG. Data bytes beyond CAN_DL are not used.
+- **Code:** protocolrx.c:isotp_rcv() N_PCI length check, isotp_rcv_fc()
+- **ISO 15765-2:** DEVIATION (if observed): a FC without N_PCI is processed with data beyond CAN_DL (EBADMSG), fixed by xl-isotp patch 31.
 
 ### TX-FC-011
 
@@ -786,6 +787,22 @@ Parameterized test cases with the same behaviour are grouped.
 - **Behaviour:** Expected (ISO): a frame without N_PCI (CAN_DL 0) is ignored and the PDU completes. Observed behaviour is reported.
 - **Code:** protocolrx.c:isotp_rcv() / isotp_rcv_cf() no minimum CAN_DL check
 - **ISO 15765-2:** DEVIATION (if observed): a CAN_DL 0 frame is processed as (empty) CF and advances the SN (see test output).
+
+### RX-CF-014
+
+**short last CF lacking bytes**
+
+- **Behaviour:** Only the last CF may be shorter than LL_DL and it has to contain all remaining bytes of the PDU. A short CF lacking bytes (here 3 of 7) is ignored and the reception continues with the correct CF.
+- **Code:** protocolrx.c:isotp_rcv_cf() last CF length check
+- **ISO 15765-2:** DEVIATION (if observed): the short CF is accepted, consumes a SN and the reception waits for further CFs (fixed by xl-isotp patch 32).
+
+### RX-CF-015
+
+**CF with N_PCI only**
+
+- **Behaviour:** A CF with only the N_PCI (no data) is a short CF lacking bytes and is ignored; the reception continues with the correct CF.
+- **Code:** protocolrx.c:isotp_rcv_cf() last CF length check
+- **ISO 15765-2:** DEVIATION (if observed): the empty CF is accepted and consumes a SN (fixed by xl-isotp patch 32).
 
 ### RX-CF-007-CC8 .. RX-CF-007-FD64 (2 variants)
 

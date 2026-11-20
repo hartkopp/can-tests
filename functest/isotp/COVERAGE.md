@@ -53,6 +53,7 @@ paths that are not reachable with virtual CAN interfaces.
 | | FF during reception (restart) | RX-FF-007, RX-FF-008 |
 | `isotp_rcv_cf()` | CAN_DL > LL_DL | RX-FF-002 |
 | | CAN_DL < LL_DL for a non-last CF | RX-CF-003, RX-CF-004 |
+| | short last CF lacking bytes / CF with N_PCI only | RX-CF-014, RX-CF-015 |
 | | no active reception | RX-CF-002, RX-SF-012, RX-FF-005 |
 | | FORCE_RXSTMIN drop / accept | RX-CF-009-*, RX-CF-010 |
 | | state changed during hrtimer_cancel() | *n/c* (race) |
@@ -69,7 +70,8 @@ paths that are not reachable with virtual CAN interfaces.
 | | XL: VCID mismatch | XL-HDR-002 |
 | | CC/FD: CAN ID or frame type mismatch | RX-ID-003, TX-FC-015, XL-HDR-006 |
 | | CC/FD: invalid frame content (len > 8/64) | *n/c* (rejected by CAN_RAW/vcan) |
-| `isotp_rcv()` | extended address mismatch | RX-SF-006, RX-SF-007, TX-FC-014-ae |
+| `isotp_rcv()` | CAN_DL < AE + N_PCI (no N_PDU) | RX-SF-003..005, RX-CF-006, TX-FC-010-* |
+| | extended address mismatch | RX-SF-006, RX-SF-007, TX-FC-014-ae |
 | | HALF_DUPLEX: non-FC during tx | TX-HD-002, TX-HD-004, E2E-HD-001 |
 | | HALF_DUPLEX: FC during rx | TX-HD-004 |
 | | SF CAN_DL <= 8 | RX-SF-001, RX-SF-002 |
