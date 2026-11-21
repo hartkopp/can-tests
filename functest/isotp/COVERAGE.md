@@ -37,7 +37,8 @@ paths that are not reachable with virtual CAN interfaces.
 | `isotp_rcv_sf()` | SF_DL 0 / SF_DL > CAN_DL - PCI | RX-SF-002, RX-SF-009, XL-SF-001 |
 | | unsigned underflow (CAN_DL < AE + PCI) | RX-SF-003, RX-SF-004, RX-SF-005 (DEVIATION) |
 | | padding check fail => EBADMSG | RX-SF-011, XL-SF-002 |
-| | CAN XL N_PDUs: no padding checks | XL-SF-002, TX-FC-011 |
+| | CAN XL N_PDUs: no padding checks | XL-SF-002 |
+| | CAN XL N_PDUs: exact SF / last CF / FC length | XL-SF-001, XL-SF-002, XL-CF-001, TX-FC-011 |
 | | terminates an ongoing reception | RX-SF-012, RX-SF-013, RX-SF-014 |
 | | alloc_skb() failure | *n/c* |
 | `isotp_rcv_ff()` | CAN_DL < 8 | RX-FF-001, RX-FF-008 |
@@ -169,6 +170,8 @@ paths that are not reachable with virtual CAN interfaces.
 | `isotp_bind()` | address length / family | API-BIND-001 |
 | | invalid tx_id / rx_id | API-BIND-002, API-BIND-003 |
 | | padding and TX_DL (no padding for CAN XL N_PDUs) | API-BIND-007 |
+| | effective TX_DL (XL_OPTS / LL_OPTS) at bind() | XL-OPT-001 |
+| | XL interface MTU (CANXL_HDR_SIZE + TX_DL, CANXL_MIN_MTU) | XL-MTU-001, API-BIND-010 |
 | | XL with 29 bit CAN IDs | API-BIND-008 |
 | | ifindex 0 | API-BIND-005 |
 | | already bound | API-BIND-001 |

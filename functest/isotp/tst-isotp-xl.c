@@ -389,9 +389,10 @@ static void xl_sf_native(struct ft_ctx *ctx, const void *param)
 	xl_sf(ctx, 100, 0x08, 98, 2, 98, 1);
 	xl_sf(ctx, 300, 0x09, 298 - 256, 2, 298, 1);
 	xl_sf(ctx, 2048, 0x0F, 0xFE, 2, 2046, 1);
-	/* SF_DL smaller than possible in CAN_DL */
-	xl_sf(ctx, 100, 0x08, 1, 2, 1, 1);
-	xl_sf(ctx, 2048, 0x08, 3, 2, 3, 1);
+	/* no padding: SF_DL smaller than the CAN_DL allows is ignored */
+	xl_sf(ctx, 100, 0x08, 1, 2, 1, 0);
+	xl_sf(ctx, 2048, 0x08, 3, 2, 3, 0);
+	xl_sf(ctx, 13, 0x08, 10, 2, 10, 0);
 
 	/* invalid */
 	xl_sf(ctx, 12, 0x00, 10, 2, 10, 0);	/* FD style escape */
@@ -423,7 +424,7 @@ static void xl_sf_pad(struct ft_ctx *ctx, const void *param)
 	xl_sf(ctx, 12, 0x08, 10, 2, 10, 1);	/* XL SF */
 	xl_sf(ctx, 11, 0x08, 9, 2, 9, 1);	/* no CAN FD DLC length */
 	xl_sf(ctx, 100, 0x08, 98, 2, 98, 1);	/* > 64 */
-	xl_sf(ctx, 64, 0x08, 7, 2, 7, 1);	/* 0xCC behind the SF data */
+	xl_sf(ctx, 64, 0x08, 7, 2, 7, 0);	/* 0xCC behind the SF data */
 	xl_sf(ctx, 12, 0x00, 10, 2, 10, 0);	/* FD style escape */
 	xl_sf(ctx, 11, 0x00, 9, 2, 9, 0);
 	xl_sf(ctx, 12, 0x05, 0, 1, 5, 0);	/* 4 bit SF_DL */
@@ -441,6 +442,62 @@ static void xl_sf_pad(struct ft_ctx *ctx, const void *param)
 
 	ft_dut_expect_noerr(ctx, env.s);
 	ft_peer_expect_none(ctx, &env.p, 10);
+	xlenv_close();
+}
+
+/* send a PDU with ll_dl where the last CF has the length lastlen first
+ * (expected to be ignored) and then its exact length
+ */
+static void xl_last_cf(struct ft_ctx *ctx, unsigned int len, unsigned int ll_dl,
+		       unsigned int lastlen)
+{
+	static uint8_t pdu[300], buf[CANXL_MAX_DLEN];
+	struct ft_frame *fr;
+	struct ft_frame f;
+	struct ft_enc e;
+	int i, n;
+
+	ft_pattern(pdu, sizeof(pdu), len);
+	e = env.pe;
+	e.ll_dl = ll_dl;
+	n = ft_enc_pdu(&e, &env.hrx, pdu, len, &fr);
+
+	ft_log(ctx, "PDU len %u LL_DL %u: last CF %u => ignored, then %u",
+	       len, ll_dl, lastlen, fr[n - 1].len);
+	ft_peer_tx(ctx, &env.p, &fr[0]);
+	if (!FT_CHECK(ctx, ft_peer_next(ctx, &env.p, &f, 100), "no FC"))
+		goto out;
+	for (i = 1; i < n - 1; i++)
+		ft_peer_tx(ctx, &env.p, &fr[i]);
+
+	/* last CF with additional bytes behind the PDU data */
+	memset(buf, 0xCC, sizeof(buf));
+	memcpy(buf, fr[n - 1].data, fr[n - 1].len);
+	ft_frame_set(&f, &env.hrx, buf, lastlen);
+	ft_peer_tx(ctx, &env.p, &f);
+	ft_dut_expect_nopdu(ctx, env.s, 50);
+
+	/* the exact last CF completes the PDU */
+	ft_peer_tx(ctx, &env.p, &fr[n - 1]);
+	ft_dut_expect_pdu(ctx, env.s, pdu, len, 200);
+out:
+	free(fr);
+}
+
+static void xl_cf_len(struct ft_ctx *ctx, const void *param)
+{
+	struct ft_isotp_cfg c;
+
+	cfg_xl(&c, "XL9-2048");
+	if (!xlenv_open(ctx, &c))
+		return;
+
+	xl_last_cf(ctx, 150, 100, 60);	/* exact: 53 */
+	xl_last_cf(ctx, 150, 100, 100);	/* full CF */
+	xl_last_cf(ctx, 201, 100, 8);	/* exact: 5 */
+	xl_last_cf(ctx, 201, 100, 100);
+
+	ft_dut_expect_noerr(ctx, env.s);
 	xlenv_close();
 }
 
@@ -672,7 +729,7 @@ static void xl_opt_order(struct ft_ctx *ctx, const void *param)
 	cfg_xl(&c, "XL9-64");
 	xl = c.xl;
 
-	/* XL_OPTS (tx_dl 64) followed by LL_OPTS (tx_dl 8) */
+	/* XL_OPTS (tx_dl 64) followed by LL_OPTS (tx_dl 8): XL tx_dl wins */
 	s = socket(PF_CAN, SOCK_DGRAM, CAN_ISOTP);
 	FT_CHECK(ctx, s >= 0, "socket");
 	FT_BAIL(ctx);
@@ -696,11 +753,11 @@ static void xl_opt_order(struct ft_ctx *ctx, const void *param)
 		return;
 	}
 
-	/* the effective TX_DL is 8 from LL_OPTS */
-	c.xl.tx_dl = 8;
+	/* the effective TX_DL is 64 from XL_OPTS (set at bind() time) */
 	ft_pattern(data, sizeof(data), 1);
 	ft_tx_pdu(ctx, s, &c, &env.p, data, 7, 0, 0);
-	ft_tx_pdu(ctx, s, &c, &env.p, data, 20, 0, 0);
+	ft_tx_pdu(ctx, s, &c, &env.p, data, 62, 0, 0);
+	ft_tx_pdu(ctx, s, &c, &env.p, data, 100, 0, 0);
 
 	ft_peer_close(&env.p);
 	close(s);
@@ -764,31 +821,45 @@ static void xl_opt_disable(struct ft_ctx *ctx, const void *param)
 
 static void xl_mtu(struct ft_ctx *ctx, const void *param)
 {
-	static uint8_t data[3000];
+	static const struct {
+		const char *mode;
+		enum ft_if iface;
+		int ret;
+	} tc[] = {
+		{ "XL9-2048", FT_IF_XL, 0 },		/* MTU 2060 */
+		{ "XL9-256-IF256", FT_IF_XL256, 0 },	/* MTU 268 = 12 + 256 */
+		{ "XL9-2048", FT_IF_XL256, -EINVAL },
+		{ "XL9-512-IF512", FT_IF_XL256, -EINVAL },
+		{ "XL9-512-IF512", FT_IF_XL512, 0 },	/* MTU 524 = 12 + 512 */
+		{ "XL9-2048", FT_IF_XL512, -EINVAL },
+		{ "XL9-8", FT_IF_XL256, 0 },		/* >= CANXL_MIN_MTU */
+		{ "XL9-64", FT_IF_FD, -EINVAL },	/* < CANXL_MIN_MTU */
+		{ "XL9-8", FT_IF_FD, -EINVAL },
+		{ "XL7-64", FT_IF_FD, -EINVAL },
+		{ "XL9-8", FT_IF_CC, -EINVAL },
+	};
 	struct ft_isotp_cfg c;
-	ssize_t n;
+	unsigned int i;
+	int s;
 
-	/* TX_DL 2048 socket on a CAN XL interface with 256 byte MTU */
-	cfg_xl(&c, "XL9-2048");
-	c.iface = FT_IF_XL256;
-	if (!xlenv_open(ctx, &c))
-		return;
+	(void)param;
 
-	ft_pattern(data, sizeof(data), 2);
-
-	/* SF up to 256 byte CAN_DL */
-	ft_tx_pdu(ctx, env.s, &c, &env.p, data, 200, 0, 0);
-	ft_tx_pdu(ctx, env.s, &c, &env.p, data, 254, 0, 0);
-
-	/* larger frames exceed the interface MTU */
-	n = ft_dut_send(ctx, env.s, data, 255, 0);
-	FT_CHECK(ctx, n == -EMSGSIZE, "SF 255: %s", ft_errname(n));
-	n = ft_dut_send(ctx, env.s, data, 3000, 0);
-	FT_CHECK(ctx, n == -EMSGSIZE, "FF 2048: %s", ft_errname(n));
-	ft_peer_expect_none(ctx, &env.p, 20);
-	ft_dut_expect_noerr(ctx, env.s);
-
-	xlenv_close();
+	for (i = 0; i < sizeof(tc) / sizeof(tc[0]); i++) {
+		if (!ft_ifindex(tc[i].iface)) {
+			ft_log(ctx, "case %u: interface %s not available", i,
+			       ft_ifname(tc[i].iface));
+			continue;
+		}
+		cfg_xl(&c, tc[i].mode);
+		c.iface = tc[i].iface;
+		s = ft_isotp_open_err(&c);
+		FT_CHECK(ctx, (s >= 0 ? 0 : s) == tc[i].ret,
+			 "case %u: %s on %s: %s (expected %s)", i, tc[i].mode,
+			 ft_ifname(tc[i].iface), ft_errname(s >= 0 ? 0 : s),
+			 ft_errname(tc[i].ret));
+		if (s >= 0)
+			close(s);
+	}
 }
 
 /* ------------------------------------------------------------------------
@@ -830,13 +901,15 @@ static const struct ft_test tests[] = {
 	  "protocolrx.c:isotp_check_frame_head() CAN_CIA_SDT6_RTR, CAN_CIA_SDT_ZDLC",
 	  "DEVIATION (if observed): tunneled RTR/ZDLC frames are processed (fixed by xl-isotp split_v2 patch 31)."),
 	T("XL-SF-001", "CAN XL SF format", 0, xl_sf_native, NULL,
-	  "CAN XL PDUs (SDT 9, no CAN FD LL) use the 4 bit SF_DL for CAN_DL <= 8. For CAN_DL > 8 the N_PCI is 0x08 | SF_DL bits 10..8 followed by SF_DL bits 7..0 (SF_DL 1..CAN_DL-2); the CAN FD escape (0x00) and 4 bit SF_DL are ignored for CAN_DL > 8.",
-	  "protocolrx.c:isotp_rcv() N_PCI_XL_SF",
-	  "REVIEW: small SF_DL values in long CAN XL frames are accepted (no optimal length check)."),
+	  "CAN XL N_PDUs (SDT 9, no CAN FD LL) use the 4 bit SF_DL for CAN_DL <= 8. For CAN_DL > 8 the N_PCI is 0x08 | SF_DL bits 10..8 followed by SF_DL bits 7..0 and CAN XL N_PDUs are not padded: CAN_DL = 2 (+ae) + SF_DL. Other CAN_DL values, the CAN FD escape (0x00) and 4 bit SF_DL are ignored for CAN_DL > 8.",
+	  "protocolrx.c:isotp_rcv() N_PCI_XL_SF, isotp_rcv_sf() xl_npdu()", NULL),
 	T("XL-SF-002", "CAN XL N_PDUs with padding checks", 0, xl_sf_pad,
 	  NULL,
-	  "CAN XL N_PDUs (LL mtu 16, CAN_DL resp. RX_DL > 8) are not padded: with RX_PADDING/CHK_PAD_* flags SF with any CAN_DL > 8 and segmented PDUs with unpadded last CFs (also CAN_DL <= 8) are received without padding checks. A SF with CAN_DL > 8 always needs the XL SF PCI flag (the CAN FD escape 0x00 is ignored). Frames with CAN_DL <= 8 (SF) follow the CAN CC padding rules.",
+	  "CAN XL N_PDUs (LL mtu 16, CAN_DL resp. RX_DL > 8) are not padded: with RX_PADDING/CHK_PAD_* flags SF with CAN_DL > 8 (exact length) and segmented PDUs with unpadded last CFs (also CAN_DL <= 8) are received without padding checks; a SF with bytes behind the SF data is ignored. A SF with CAN_DL > 8 always needs the XL SF PCI flag (the CAN FD escape 0x00 is ignored). Frames with CAN_DL <= 8 (SF) follow the CAN CC padding rules.",
 	  "protocolrx.c:isotp_rcv() N_PCI_XL_SF, chk_pad_fail() ll_dl", NULL),
+	T("XL-CF-001", "CAN XL last CF length", 0, xl_cf_len, NULL,
+	  "CAN XL N_PDUs (RX_DL > 8) are not padded: a last CF with more bytes than the missing PDU data is ignored (also with CAN_DL <= 8), the reception continues and the exact last CF completes the PDU.",
+	  "protocolrx.c:isotp_rcv_cf() xl_npdu()", NULL),
 	T("XL-SDT6-001", "SDT 6 reception of long frames", 0, xl_sdt6_rx, NULL,
 	  "Expected: a CAN CC tunnel (SDT 6) socket only processes frames with CAN_DL <= 8. Observed behaviour is reported.",
 	  "protocolrx.c:isotp_rcv(), isotp_rcv_ff() (no SDT 6 specific length check)",
@@ -855,16 +928,14 @@ static const struct ft_test tests[] = {
 	  "A SDT 9 socket with LL mtu 72 handles CAN FD N_PDUs: SF with CAN_DL > 8 need the CAN FD escape (0x00) and a CAN FD length <= 64, FF with other lengths are ignored, PDUs with any CAN FD sender LL_DL are received.",
 	  "protocolrx.c:isotp_check_frame_head() fd_pdu(), isotp_rcv()", NULL),
 	T("XL-OPT-001", "LL_OPTS after XL_OPTS", 0, xl_opt_order, NULL,
-	  "The TX_DL is set by the last CAN_ISOTP_LL_OPTS or CAN_ISOTP_XL_OPTS call: LL_OPTS after XL_OPTS overrides the XL tx_dl for the transmission (getsockopt still returns the XL tx_dl).",
-	  "isotp.c:isotp_setsockopt_locked() so->tx.ll_dl",
-	  "REVIEW: socket option order dependency; the effective TX_DL is not visible via getsockopt()."),
+	  "The effective TX_DL is set at bind() time independent of the order of the socket options: in XL mode the tx_dl from CAN_ISOTP_XL_OPTS (as returned by getsockopt()), else the tx_dl from CAN_ISOTP_LL_OPTS.",
+	  "isotp.c:isotp_bind() so->tx.ll_dl", NULL),
 	T("XL-OPT-002", "disabling XL mode", 0, xl_opt_disable, NULL,
 	  "Disabling the XL mode restores the LL tx_dl and CAN CC/FD frames are sent.",
 	  "isotp.c:isotp_setsockopt_locked() CAN_ISOTP_XL_OPTS", NULL),
 	T("XL-MTU-001", "TX_DL larger than interface MTU", 0, xl_mtu, NULL,
-	  "bind() does not check the CAN XL TX_DL against the interface MTU. Frames that fit into the MTU are sent, larger frames make send() fail with EMSGSIZE.",
-	  "isotp.c:isotp_bind(), af_can.c:can_send()",
-	  "REVIEW: the CAN XL TX_DL is not limited to the interface MTU at bind() time."),
+	  "In XL mode bind() requires an interface MTU >= CANXL_HDR_SIZE + TX_DL and >= CANXL_MIN_MTU (CAN XL capable interface), else EINVAL.",
+	  "isotp.c:isotp_bind() isotp_req_mtu()", NULL),
 };
 
 int main(int argc, char **argv)

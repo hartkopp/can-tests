@@ -1362,17 +1362,18 @@ static void api_bind_xl_on_cc(struct ft_ctx *ctx, const void *param)
 
 	(void)param;
 
-	/* the XL mode does not check for a CAN XL capable interface */
+	/* the XL mode needs a CAN XL capable interface */
 	ft_cfg_init(&c);
 	ft_cfg_mode(&c, ft_mode_by_name("XL9-64"));
 	c.iface = FT_IF_CC;
-	s = ft_isotp_open(ctx, &c);
-	FT_BAIL(ctx);
+	s = ft_isotp_open_err(&c);
+	FT_CHECK(ctx, s == -EINVAL, "bind() of XL socket to CC interface: %s",
+		 ft_errname(s >= 0 ? 0 : s));
+	if (s < 0)
+		return;
 
 	n = ft_dut_send(ctx, s, data, sizeof(data), 0);
-	FT_CHECK(ctx, n == -EMSGSIZE, "XL frame on CC interface: %s",
-		 ft_errname(n));
-
+	ft_log(ctx, "send() = %s", ft_errname(n));
 	close(s);
 }
 
@@ -2050,9 +2051,8 @@ static const struct ft_test tests[] = {
 	  "isotp.c:isotp_bind() notify_enetdown, protocoltx.c:isotp_sendmsg() can_send()", NULL),
 	T("API-BIND-010", "bind() of XL socket to CC interface", 0,
 	  api_bind_xl_on_cc,
-	  "bind() does not check whether the interface supports CAN XL frames. Sending fails synchronously with EMSGSIZE (CAN frame size > interface MTU).",
-	  "isotp.c:isotp_bind(), af_can.c:can_send()",
-	  "REVIEW: an XL socket can be bound to a CAN CC/FD interface without error."),
+	  "bind() of a socket in XL mode to an interface without CAN XL support (MTU < CANXL_MIN_MTU) fails with EINVAL.",
+	  "isotp.c:isotp_bind() isotp_req_mtu()", NULL),
 	T("API-IO-001", "send()/recv() on unbound socket", 0, api_io_unbound,
 	  "send() and recv() on an unbound socket fail with EADDRNOTAVAIL.",
 	  "protocoltx.c:isotp_sendmsg(), isotp.c:isotp_recvmsg()", NULL),

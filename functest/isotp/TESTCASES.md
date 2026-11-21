@@ -202,9 +202,8 @@ Parameterized test cases with the same behaviour are grouped.
 
 **bind() of XL socket to CC interface**
 
-- **Behaviour:** bind() does not check whether the interface supports CAN XL frames. Sending fails synchronously with EMSGSIZE (CAN frame size > interface MTU).
-- **Code:** isotp.c:isotp_bind(), af_can.c:can_send()
-- **ISO 15765-2:** REVIEW: an XL socket can be bound to a CAN CC/FD interface without error.
+- **Behaviour:** bind() of a socket in XL mode to an interface without CAN XL support (MTU < CANXL_MIN_MTU) fails with EINVAL.
+- **Code:** isotp.c:isotp_bind() isotp_req_mtu()
 
 ### API-IO-001
 
@@ -389,7 +388,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **FC padding checks**
 
-- **Behaviour:** With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING\|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING\|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING rejects every FC. Failing FCs abort the transfer with EBADMSG.
+- **Behaviour:** With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING\|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING\|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING rejects every FC. In XL mode (CAN XL N_PDUs, no padding) a FC with CAN_DL > 8 is invalid. Failing FCs abort the transfer with EBADMSG.
 - **Code:** protocolrx.c:isotp_rcv_fc(), chk_pad_fail(), chk_optimized_fail()
 - **ISO 15765-2:** REVIEW: CAN_ISOTP_CHK_PAD_DATA without CAN_ISOTP_RX_PADDING makes every frame fail the check (configuration not rejected).
 
@@ -972,16 +971,22 @@ Parameterized test cases with the same behaviour are grouped.
 
 **CAN XL SF format**
 
-- **Behaviour:** CAN XL PDUs (SDT 9, no CAN FD LL) use the 4 bit SF_DL for CAN_DL <= 8. For CAN_DL > 8 the N_PCI is 0x08 \| SF_DL bits 10..8 followed by SF_DL bits 7..0 (SF_DL 1..CAN_DL-2); the CAN FD escape (0x00) and 4 bit SF_DL are ignored for CAN_DL > 8.
-- **Code:** protocolrx.c:isotp_rcv() N_PCI_XL_SF
-- **ISO 15765-2:** REVIEW: small SF_DL values in long CAN XL frames are accepted (no optimal length check).
+- **Behaviour:** CAN XL N_PDUs (SDT 9, no CAN FD LL) use the 4 bit SF_DL for CAN_DL <= 8. For CAN_DL > 8 the N_PCI is 0x08 \| SF_DL bits 10..8 followed by SF_DL bits 7..0 and CAN XL N_PDUs are not padded: CAN_DL = 2 (+ae) + SF_DL. Other CAN_DL values, the CAN FD escape (0x00) and 4 bit SF_DL are ignored for CAN_DL > 8.
+- **Code:** protocolrx.c:isotp_rcv() N_PCI_XL_SF, isotp_rcv_sf() xl_npdu()
 
 ### XL-SF-002
 
 **CAN XL N_PDUs with padding checks**
 
-- **Behaviour:** CAN XL N_PDUs (LL mtu 16, CAN_DL resp. RX_DL > 8) are not padded: with RX_PADDING/CHK_PAD_* flags SF with any CAN_DL > 8 and segmented PDUs with unpadded last CFs (also CAN_DL <= 8) are received without padding checks. A SF with CAN_DL > 8 always needs the XL SF PCI flag (the CAN FD escape 0x00 is ignored). Frames with CAN_DL <= 8 (SF) follow the CAN CC padding rules.
+- **Behaviour:** CAN XL N_PDUs (LL mtu 16, CAN_DL resp. RX_DL > 8) are not padded: with RX_PADDING/CHK_PAD_* flags SF with CAN_DL > 8 (exact length) and segmented PDUs with unpadded last CFs (also CAN_DL <= 8) are received without padding checks; a SF with bytes behind the SF data is ignored. A SF with CAN_DL > 8 always needs the XL SF PCI flag (the CAN FD escape 0x00 is ignored). Frames with CAN_DL <= 8 (SF) follow the CAN CC padding rules.
 - **Code:** protocolrx.c:isotp_rcv() N_PCI_XL_SF, chk_pad_fail() ll_dl
+
+### XL-CF-001
+
+**CAN XL last CF length**
+
+- **Behaviour:** CAN XL N_PDUs (RX_DL > 8) are not padded: a last CF with more bytes than the missing PDU data is ignored (also with CAN_DL <= 8), the reception continues and the exact last CF completes the PDU.
+- **Code:** protocolrx.c:isotp_rcv_cf() xl_npdu()
 
 ### XL-SDT6-001
 
@@ -1024,9 +1029,8 @@ Parameterized test cases with the same behaviour are grouped.
 
 **LL_OPTS after XL_OPTS**
 
-- **Behaviour:** The TX_DL is set by the last CAN_ISOTP_LL_OPTS or CAN_ISOTP_XL_OPTS call: LL_OPTS after XL_OPTS overrides the XL tx_dl for the transmission (getsockopt still returns the XL tx_dl).
-- **Code:** isotp.c:isotp_setsockopt_locked() so->tx.ll_dl
-- **ISO 15765-2:** REVIEW: socket option order dependency; the effective TX_DL is not visible via getsockopt().
+- **Behaviour:** The effective TX_DL is set at bind() time independent of the order of the socket options: in XL mode the tx_dl from CAN_ISOTP_XL_OPTS (as returned by getsockopt()), else the tx_dl from CAN_ISOTP_LL_OPTS.
+- **Code:** isotp.c:isotp_bind() so->tx.ll_dl
 
 ### XL-OPT-002
 
@@ -1039,9 +1043,8 @@ Parameterized test cases with the same behaviour are grouped.
 
 **TX_DL larger than interface MTU**
 
-- **Behaviour:** bind() does not check the CAN XL TX_DL against the interface MTU. Frames that fit into the MTU are sent, larger frames make send() fail with EMSGSIZE.
-- **Code:** isotp.c:isotp_bind(), af_can.c:can_send()
-- **ISO 15765-2:** REVIEW: the CAN XL TX_DL is not limited to the interface MTU at bind() time.
+- **Behaviour:** In XL mode bind() requires an interface MTU >= CANXL_HDR_SIZE + TX_DL and >= CANXL_MIN_MTU (CAN XL capable interface), else EINVAL.
+- **Code:** isotp.c:isotp_bind() isotp_req_mtu()
 
 ## e2e
 
