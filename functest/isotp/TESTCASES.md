@@ -1222,15 +1222,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **echo timeout SF (WAIT_TX_DONE)**
 
-- **Behaviour:** vcan with echo=1 and netem loss 100% (setup_vcan.sh -e): when the local echo of a SF does not arrive, the transfer is aborted after 2 s + frame_txtime and send() with CAN_ISOTP_WAIT_TX_DONE returns ECOMM; the socket error is cleared and the socket is idle again.
-- **Code:** protocoltx.c:isotp_sendmsg() echotimer, hrtimer.c:isotp_echo_timer_handler(), isotp_tx_timeout()
-- **Flags:** slow timing
-
-### TIM-ECHO-HW-001
-
-**echo timeout SF (WAIT_TX_DONE) (real CAN)**
-
-- **Behaviour:** Real CAN interface (FT_IF_HW) without bus partner: when the local echo of a SF does not arrive, the transfer is aborted after 2 s + frame_txtime and send() with CAN_ISOTP_WAIT_TX_DONE returns ECOMM; the socket error is cleared and the socket is idle again.
+- **Behaviour:** vcan with echo=1 and netem loss 100%: when the local echo of a SF does not arrive, the transfer is aborted after 2 s + frame_txtime and send() with CAN_ISOTP_WAIT_TX_DONE returns ECOMM; the socket error is cleared and the socket is idle again.
 - **Code:** protocoltx.c:isotp_sendmsg() echotimer, hrtimer.c:isotp_echo_timer_handler(), isotp_tx_timeout()
 - **Flags:** slow timing
 
@@ -1238,15 +1230,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **echo timeout SF (asynchronous)**
 
-- **Behaviour:** vcan with echo=1 and netem loss 100% (setup_vcan.sh -e): without CAN_ISOTP_WAIT_TX_DONE send() returns immediately; while waiting for the echo the socket is not writable and further send() calls fail with EAGAIN (MSG_DONTWAIT). After 2 s + frame_txtime the socket error ECOMM is reported and the socket is idle again.
-- **Code:** protocoltx.c:isotp_sendmsg() echotimer, hrtimer.c:isotp_echo_timer_handler()
-- **Flags:** slow timing
-
-### TIM-ECHO-HW-002
-
-**echo timeout SF (asynchronous) (real CAN)**
-
-- **Behaviour:** Real CAN interface (FT_IF_HW) without bus partner: without CAN_ISOTP_WAIT_TX_DONE send() returns immediately; while waiting for the echo the socket is not writable and further send() calls fail with EAGAIN (MSG_DONTWAIT). After 2 s + frame_txtime the socket error ECOMM is reported and the socket is idle again.
+- **Behaviour:** vcan with echo=1 and netem loss 100%: without CAN_ISOTP_WAIT_TX_DONE send() returns immediately; while waiting for the echo the socket is not writable and further send() calls fail with EAGAIN (MSG_DONTWAIT). After 2 s + frame_txtime the socket error ECOMM is reported and the socket is idle again.
 - **Code:** protocoltx.c:isotp_sendmsg() echotimer, hrtimer.c:isotp_echo_timer_handler()
 - **Flags:** slow timing
 
@@ -1254,15 +1238,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **echo timeout CF broadcast FF**
 
-- **Behaviour:** vcan with echo=1 and netem loss 100% (setup_vcan.sh -e): in CF broadcast mode the echo of the FF is monitored; without echo the transfer is aborted after 2 s + frame_txtime with ECOMM.
-- **Code:** protocoltx.c:isotp_sendmsg() CF broadcast cfecho, hrtimer.c:isotp_echo_timer_handler()
-- **Flags:** slow timing
-
-### TIM-ECHO-HW-003
-
-**echo timeout CF broadcast FF (real CAN)**
-
-- **Behaviour:** Real CAN interface (FT_IF_HW) without bus partner: in CF broadcast mode the echo of the FF is monitored; without echo the transfer is aborted after 2 s + frame_txtime with ECOMM.
+- **Behaviour:** vcan with echo=1 and netem loss 100%: in CF broadcast mode the echo of the FF is monitored; without echo the transfer is aborted after 2 s + frame_txtime with ECOMM.
 - **Code:** protocoltx.c:isotp_sendmsg() CF broadcast cfecho, hrtimer.c:isotp_echo_timer_handler()
 - **Flags:** slow timing
 
@@ -1270,16 +1246,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **FF without echo (N_Bs)**
 
-- **Behaviour:** vcan with echo=1 and netem loss 100% (setup_vcan.sh -e): the echo of a FF (with FC) is not monitored, the transfer is aborted by the N_Bs timeout after 1 s + frame_txtime with ECOMM.
-- **Code:** protocoltx.c:isotp_sendmsg() txtimer for ISOTP_WAIT_FIRST_FC
-- **ISO 15765-2:** REVIEW: N_As (missing transmission confirmation) is monitored with 2 s for SF/CF and covered by N_Bs (1 s) for the FF.
-- **Flags:** slow timing
-
-### TIM-ECHO-HW-004
-
-**FF without echo (N_Bs) (real CAN)**
-
-- **Behaviour:** Real CAN interface (FT_IF_HW) without bus partner: the echo of a FF (with FC) is not monitored, the transfer is aborted by the N_Bs timeout after 1 s + frame_txtime with ECOMM.
+- **Behaviour:** vcan with echo=1 and netem loss 100%: the echo of a FF (with FC) is not monitored, the transfer is aborted by the N_Bs timeout after 1 s + frame_txtime with ECOMM.
 - **Code:** protocoltx.c:isotp_sendmsg() txtimer for ISOTP_WAIT_FIRST_FC
 - **ISO 15765-2:** REVIEW: N_As (missing transmission confirmation) is monitored with 2 s for SF/CF and covered by N_Bs (1 s) for the FF.
 - **Flags:** slow timing
@@ -1288,7 +1255,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **late echo after echo timeout**
 
-- **Behaviour:** vcan with echo=1 and netem delay 3000ms (setup_vcan.sh -e): a SF whose echo arrives after 3 s is aborted after 2 s + frame_txtime with ECOMM. The late echo arriving during the next SF transfer does not complete that transfer (echo identified by the skb uid), which is aborted with ECOMM as well.
+- **Behaviour:** vcan with echo=1 and netem delay 3000ms: a SF whose echo arrives after 3 s is aborted after 2 s + frame_txtime with ECOMM. The late echo arriving during the next SF transfer does not complete that transfer (echo identified by the skb uid), which is aborted with ECOMM as well.
 - **Code:** protocoltx.c:isotp_rcv_echo() cfecho / can_skb_uid check
 - **Flags:** slow timing
 
@@ -1296,7 +1263,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **netem delayed echo (STmin 10 ms)**
 
-- **Behaviour:** vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): a SF send() with WAIT_TX_DONE returns after the delayed echo. Expected: the separation time between CFs (STmin + frame_txtime) starts at the echo of the previous CF (gap = echo delay + STmin + frame_txtime). Observed behaviour is reported.
+- **Behaviour:** vcan with echo=1 and netem delay 100ms: a SF send() with WAIT_TX_DONE returns after the delayed echo. Expected: the separation time between CFs (STmin + frame_txtime) starts at the echo of the previous CF (gap = echo delay + STmin + frame_txtime). Observed behaviour is reported.
 - **Code:** protocoltx.c:isotp_send_cframe() alloc_skb()/can_skb_set_owner(), isotp_rcv_echo() skb->sk check, sch_netem.c:netem_enqueue(), sock.c:skb_orphan_partial()
 - **ISO 15765-2:** FINDING (if observed): netem with delay orphans the CF skbs (sock_efree destructor), the CF echo is not recognized and the transfer is aborted with ECOMM. Cause in net/core: skb_orphan_partial() does not keep already partially orphaned (sock_efree) skbs.
 - **Flags:** timing
@@ -1305,7 +1272,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **netem delayed echo (CF broadcast)**
 
-- **Behaviour:** vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): expected: in CF broadcast mode each frame (incl. the FF) is sent after the echo of the previous frame + frame_txtime. Observed behaviour is reported.
+- **Behaviour:** vcan with echo=1 and netem delay 100ms: expected: in CF broadcast mode each frame (incl. the FF) is sent after the echo of the previous frame + frame_txtime. Observed behaviour is reported.
 - **Code:** protocoltx.c:isotp_send_cframe() alloc_skb()/can_skb_set_owner(), isotp_rcv_echo() skb->sk check, sch_netem.c:netem_enqueue(), sock.c:skb_orphan_partial()
 - **ISO 15765-2:** FINDING (if observed): netem with delay orphans the CF skbs (sock_efree destructor), the CF echo is not recognized and the transfer is aborted with ECOMM. Cause in net/core: skb_orphan_partial() does not keep already partially orphaned (sock_efree) skbs.
 - **Flags:** timing
@@ -1314,7 +1281,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **slow bus paces CFs (tbf, STmin 0)**
 
-- **Behaviour:** vcan with echo=1 and tbf rate 2kbit (setup_vcan.sh -e, 64 ms per CAN CC frame): the transfer completes and the CFs are paced by the transmission confirmation (echo): gap = max(frame time, STmin + frame_txtime) = 64 ms.
+- **Behaviour:** vcan with echo=1 and tbf rate 2kbit (64 ms per CAN CC frame): the transfer completes and the CFs are paced by the transmission confirmation (echo): gap = max(frame time, STmin + frame_txtime) = 64 ms.
 - **Code:** protocoltx.c:isotp_rcv_echo()
 - **Flags:** timing
 
@@ -1322,7 +1289,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **slow bus paces CFs (tbf, STmin 100 ms)**
 
-- **Behaviour:** vcan with echo=1 and tbf rate 2kbit (setup_vcan.sh -e, 64 ms per CAN CC frame): with STmin 100 ms > frame time the gap between CFs is STmin + frame_txtime, measured from the echo of the previous CF.
+- **Behaviour:** vcan with echo=1 and tbf rate 2kbit (64 ms per CAN CC frame): with STmin 100 ms > frame time the gap between CFs is STmin + frame_txtime, measured from the echo of the previous CF.
 - **Code:** protocoltx.c:isotp_rcv_echo() txfrtimer start
 - **Flags:** timing
 
@@ -1330,7 +1297,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **slow bus paces CF broadcast (tbf)**
 
-- **Behaviour:** vcan with echo=1 and tbf rate 2kbit (setup_vcan.sh -e, 64 ms per CAN CC frame): in CF broadcast mode the CFs are paced by the transmission confirmation (gap between the CFs = frame time).
+- **Behaviour:** vcan with echo=1 and tbf rate 2kbit (64 ms per CAN CC frame): in CF broadcast mode the CFs are paced by the transmission confirmation (gap between the CFs = frame time).
 - **Code:** protocoltx.c:isotp_rcv_echo()
 - **Flags:** timing
 

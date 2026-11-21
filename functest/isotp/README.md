@@ -63,7 +63,7 @@ existing `vcanX` interfaces):
 | vcaniso3 | 524 | CAN XL (512 byte data) |
 | vcaniso4 | 268 | CAN XL (256 byte data) |
 | vcaniso5 | 16 | CAN CC, interface down (ENETDOWN tests) |
-| vcaniso6..9 | 16 | optional, vcan echo=1 + netem (`setup_vcan.sh -e`, see below) |
+| vcaniso6..9 | 16 | vcan echo=1 + netem/tbf (echo tests, see below) |
 
 Other interface names can be given with the environment variables
 `FT_IF_CC`, `FT_IF_FD`, `FT_IF_XL`, `FT_IF_XL512`, `FT_IF_XL256` and
@@ -75,10 +75,6 @@ Without the vcan module parameter `echo=1` the CAN core creates the local
 echo directly after the frame is queued, so it can not be delayed or
 suppressed. With `echo=1` the vcan driver creates the echo after the
 frame has passed the qdisc, and a netem qdisc can drop or delay it:
-
-```bash
-sudo ./setup_vcan.sh -e up
-```
 
 | Interface | qdisc | Usage |
 |---|---|---|
@@ -121,29 +117,14 @@ Possible fix in net/core/sock.c (not applied, not tested):
 
 tbf keeps the socket reference.
 
-The `echo` parameter applies to all vcan interfaces of the system. The
-script reloads the vcan module only if no other vcan interfaces than
-`vcaniso*` exist (`-f` forces the reload and removes all vcan
-interfaces). All other test cases work with `echo=1` as well. The test
-cases `TIM-ECHO-001..010` are skipped without these interfaces.
-
-### Optional real CAN interface (echo timeout)
-
-The test cases `TIM-ECHO-HW-*` (timing suite) run the echo timeout tests
-on a real CAN interface when `FT_IF_HW` names such an interface:
-
-- the interface is configured (bitrate) and up, its driver supports
-  `IFF_ECHO` (echo after successful transmission),
-- **no other node is connected** (or the bus is not terminated), so the
-  frames are never acknowledged.
-
-```bash
-FT_IF_HW=can0 ./run_tests.sh -s timing -t 'TIM-ECHO-HW-*'
-```
-
-The unacknowledged frames stay pending in the CAN controller / tx queue.
-Restart the interface afterwards (as root: `ip link set can0 down` and
-`ip link set can0 up`) before using it for other purposes.
+The `echo` parameter applies to all vcan interfaces of the system.
+`setup_vcan.sh` loads the vcan module with `echo=1`. When vcan is already
+loaded without echo support, the module is reloaded if no other vcan
+interfaces than `vcaniso*` exist. Otherwise the setup is aborted with an
+error; `setup_vcan.sh -e` then removes all vcan interfaces and reloads
+the vcan module with `echo=1`. All other test cases work with `echo=1`
+as well. The test cases `TIM-ECHO-001..010` are skipped without these
+interfaces.
 
 `setup_vcan.sh -r` raises `net.core.rmem_max` to 8 MByte. The CAN_RAW
 peer records all frames in a background thread; a larger receive buffer

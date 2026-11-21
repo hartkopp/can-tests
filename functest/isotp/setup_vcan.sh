@@ -4,19 +4,21 @@
 # setup_vcan.sh - create the virtual CAN interfaces for the CAN_ISOTP
 #                 functional test suite (run as root)
 #
-# usage: setup_vcan.sh [-r] [-e [-f]] [up|down|status]
+# usage: setup_vcan.sh [-r] [-e] [up|down|status]
 #
-#   up      (default) load the CAN modules and create the interfaces
+#   up      (default) load the CAN modules (vcan with echo=1) and create
+#           the interfaces
 #   down    remove the interfaces
 #   status  show the interfaces
 #   -r      also raise net.core.rmem_max to 8 MByte (recommended: the
 #           CAN_RAW peer of the test suite records long frame bursts)
-#   -e      echo mode: (re)load the vcan module with echo=1 and create
-#           the additional interfaces vcaniso6..9 with netem/tbf qdiscs for
-#           the echo timeout tests. The vcan module parameter applies to
-#           all vcan interfaces: the module is only reloaded when no other
-#           vcan interfaces than vcaniso* exist (-f forces the reload and
-#           removes all vcan interfaces). Needs sch_netem, sch_tbf, tc.
+#   -e      remove all vcan interfaces and reload the vcan module with
+#           echo=1 when it is loaded without echo support
+#
+# The vcan module parameter echo=1 applies to all vcan interfaces. When
+# vcan is loaded without echo support it is reloaded automatically if no
+# other vcan interfaces than vcaniso* exist. Otherwise the setup is
+# aborted (use -e). Needs sch_netem, sch_tbf and tc.
 #
 # Interfaces (names do not collide with existing vcanX interfaces):
 #
@@ -27,7 +29,7 @@
 #   vcaniso4  MTU 268   CAN XL (256 byte data)
 #   vcaniso5  MTU 16    CAN CC, interface stays DOWN (ENETDOWN tests)
 #
-# with -e (vcan echo=1, the local echo passes the qdisc):
+# vcan echo=1 interfaces (the local echo passes the qdisc):
 #
 #   vcaniso6  MTU 16    netem loss 100%   => echo never arrives
 #   vcaniso7  MTU 16    netem delay 3000ms => echo after the 2 s timeout
@@ -45,12 +47,10 @@ ECHO_IFACES="vcaniso6:16:up:netem_loss_100% vcaniso7:16:up:netem_delay_3000ms vc
 
 RMEM=0
 ECHO=0
-FORCE=0
 while [ $# -gt 0 ]; do
 	case "$1" in
 	-r) RMEM=1 ;;
 	-e) ECHO=1 ;;
-	-f) FORCE=1 ;;
 	*) break ;;
 	esac
 	shift
@@ -89,8 +89,11 @@ load_vcan_echo() {
 		for n in $(vcan_list); do
 			case $n in vcaniso*) ;; *) others="$others $n" ;; esac
 		done
-		if [ -n "$others" ] && [ $FORCE = 0 ]; then
-			die "other vcan interfaces exist:$others - reloading vcan with echo=1 removes them (use -f to force)"
+		if [ -n "$others" ] && [ $ECHO = 0 ]; then
+			echo "vcan has no echo support and other vcan interfaces are active:$others" >&2
+			echo >&2
+			echo "use '-e' option to remove and reload the vcan module with enabled echo support (will remove the existing vcan interfaces!)" >&2
+			exit 1
 		fi
 		for n in $(vcan_list); do
 			ip link del dev "$n" 2>/dev/null
@@ -103,7 +106,7 @@ load_vcan_echo() {
 
 case "$CMD" in
 up)
-	[ $ECHO = 1 ] && load_vcan_echo
+	load_vcan_echo
 
 	for m in can can_raw can_bcm can_isotp vcan sch_netem sch_tbf; do
 		modprobe $m 2>/dev/null || \
@@ -129,25 +132,23 @@ up)
 		fi
 	done
 
-	if [ $ECHO = 1 ]; then
-		for e in $ECHO_IFACES; do
-			name=${e%%:*}
-			rest=${e#*:}
-			mtu=${rest%%:*}
-			qdisc=$(echo "${rest##*:}" | tr '_' ' ')
+	for e in $ECHO_IFACES; do
+		name=${e%%:*}
+		rest=${e#*:}
+		mtu=${rest%%:*}
+		qdisc=$(echo "${rest##*:}" | tr '_' ' ')
 
-			if [ ! -e /sys/class/net/$name ]; then
-				ip link add dev $name type vcan || \
-					die "can not create $name"
-			fi
-			ip link set dev $name down
-			ip link set dev $name mtu $mtu
-			ip link set dev $name up || die "can not set $name up"
-			# shellcheck disable=SC2086
-			tc qdisc replace dev $name root $qdisc || \
-				die "can not set qdisc $qdisc on $name"
-		done
-	fi
+		if [ ! -e /sys/class/net/$name ]; then
+			ip link add dev $name type vcan || \
+				die "can not create $name"
+		fi
+		ip link set dev $name down
+		ip link set dev $name mtu $mtu
+		ip link set dev $name up || die "can not set $name up"
+		# shellcheck disable=SC2086
+		tc qdisc replace dev $name root $qdisc || \
+			die "can not set qdisc $qdisc on $name"
+	done
 
 	if [ $RMEM = 1 ]; then
 		sysctl -w net.core.rmem_max=8388608
@@ -164,7 +165,7 @@ down)
 status)
 	;;
 *)
-	die "usage: setup_vcan.sh [-r] [up|down|status]"
+	die "usage: setup_vcan.sh [-r] [-e] [up|down|status]"
 	;;
 esac
 
