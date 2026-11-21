@@ -95,8 +95,31 @@ have this partially orphaned state (`sock_efree` + socket reference) but
 are fully orphaned and lose `skb->sk`. Their echo is then not recognized
 by `isotp_rcv_echo()`; TIM-ECHO-006/007 report this as `# FINDING`. The
 cause is in net/core, not in CAN_ISOTP: `skb_orphan_partial()` should
-keep skbs with the `sock_efree` destructor (see also the comment in
-net/tls/tls_device_fallback.c). tbf keeps the socket reference.
+keep skbs with the `sock_efree` destructor. net/tls/tls_device_fallback.c
+already relies on this meaning of `sock_efree`:
+
+```c
+	/* sock_efree means skb must gone through skb_orphan_partial() */
+	if (nskb->destructor == sock_efree)
+		return;
+```
+
+Possible fix in net/core/sock.c (not applied, not tested):
+
+```diff
+@@ -2821,6 +2821,10 @@ void skb_orphan_partial(struct sk_buff *skb)
+ 	if (skb_is_tcp_pure_ack(skb))
+ 		return;
+ 
++	/* skb has already been partially orphaned (e.g. CAN echo skbs) */
++	if (skb->destructor == sock_efree)
++		return;
++
+ 	if (can_skb_orphan_partial(skb) && skb_set_owner_sk_safe(skb, skb->sk))
+ 		return;
+```
+
+tbf keeps the socket reference.
 
 The `echo` parameter applies to all vcan interfaces of the system. The
 script reloads the vcan module only if no other vcan interfaces than
