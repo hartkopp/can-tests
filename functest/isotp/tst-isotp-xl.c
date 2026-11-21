@@ -221,26 +221,62 @@ static void xl_rx_filter(struct ft_ctx *ctx, const void *param)
 	xlenv_close();
 }
 
+struct af_bits_param {
+	const char *mode;
+	bool bit30_ok;		/* SDT 7 BRS / SDT 6 RTR */
+	bool bit31_ok;		/* ZDLC (SDT 6/7) */
+};
+
+/* SF with the given header: accepted as expected, or a deviation when an
+ * expected drop is accepted
+ */
+static void xl_rx_sf_obs(struct ft_ctx *ctx, const struct ft_frame *hdr,
+			 bool accept, const char *what)
+{
+	uint8_t pdu[5] = { 1, 2, 3, 4, 5 };
+	uint8_t buf[16];
+	struct ft_frame f;
+	ssize_t n;
+
+	ft_frame_bytes(&f, hdr, 6, 0x05, 1, 2, 3, 4, 5);
+	ft_peer_tx(ctx, &env.p, &f);
+	n = ft_dut_recv(ctx, env.s, buf, sizeof(buf), 100);
+
+	if (n >= 0) {
+		FT_CHECK(ctx, n == 5 && !memcmp(buf, pdu, 5),
+			 "%s: unexpected PDU (len %zd)", what, n);
+		if (accept)
+			ft_log(ctx, "%s => accepted", what);
+		else
+			ft_note_dev(ctx, "%s accepted", what);
+	} else {
+		FT_CHECK(ctx, !accept, "%s ignored: %s", what, ft_errname(n));
+		ft_log(ctx, "%s => ignored", what);
+	}
+}
+
 static void xl_rx_af_bits(struct ft_ctx *ctx, const void *param)
 {
+	const struct af_bits_param *ap = param;
 	struct ft_isotp_cfg c;
 	struct ft_frame h;
 
-	cfg_xl(&c, param);
+	cfg_xl(&c, ap->mode);
 	c.xl.rx_addr = CAN_EFF_FLAG | 0x54321;
 	if (!xlenv_open(ctx, &c))
 		return;
 
-	/* AF bit 30 (SDT 7 BRS indication) is ignored at reception time */
-	h = env.hrx;
-	h.af |= FT_AF_SDT7_BRS;
-	xl_rx_sf(ctx, &h, true, "AF with bit 30 (BRS)");
+	xl_rx_sf_obs(ctx, &env.hrx, true, "AF without bit 30/31");
 
-	/* AF bit 31 is ignored as well */
+	h = env.hrx;
+	h.af |= 0x40000000;
+	xl_rx_sf_obs(ctx, &h, ap->bit30_ok, "AF with bit 30 (SDT 7 BRS / SDT 6 RTR)");
+
 	h = env.hrx;
 	h.af |= 0x80000000;
-	xl_rx_sf(ctx, &h, true, "AF with bit 31");
+	xl_rx_sf_obs(ctx, &h, ap->bit31_ok, "AF with bit 31 (ZDLC)");
 
+	ft_dut_expect_noerr(ctx, env.s);
 	xlenv_close();
 }
 
@@ -715,14 +751,15 @@ static const struct ft_test tests[] = {
 	  "A CAN XL frame is only processed if prio & 0x7FF == rx_id, VCID == rx_vcid, flags == rx_flags (exact match), (af & 0x3FFFFFFF) == rx_addr (29 bit address with bit 29) and sdt == sdt_mode. CAN CC/FD frames are ignored by CAN XL sockets.",
 	  "protocolrx.c:isotp_check_frame_head()", NULL),
 	T("XL-HDR-003", "AF bits 30/31 ignored (SDT 9)", 0, xl_rx_af_bits,
-	  "XL9-64",
-	  "The AF bits 30 (SDT 7 BRS) and 31 are ignored at reception time.",
+	  &((const struct af_bits_param){ "XL9-64", true, true }),
+	  "In SDT 9 mode the AF bits 30 and 31 are ignored at reception time.",
 	  "protocolrx.c:isotp_check_frame_head() CAN_CIA_ADDR_MASK",
-	  "REVIEW: AF bit 30/31 are ignored in all SDT modes (not only for SDT 7)."),
-	T("XL-HDR-004", "AF bits 30/31 ignored (SDT 7)", 0, xl_rx_af_bits,
-	  "XL7-64",
-	  "The AF bits 30 (SDT 7 BRS) and 31 are ignored at reception time.",
-	  "protocolrx.c:isotp_check_frame_head() CAN_CIA_ADDR_MASK", NULL),
+	  "REVIEW: AF bits 30/31 are not checked for native ISO 15765-2 N_PDUs (SDT 9)."),
+	T("XL-HDR-004", "AF bits 30/31 (SDT 7)", 0, xl_rx_af_bits,
+	  &((const struct af_bits_param){ "XL7-64", true, false }),
+	  "In SDT 7 (CAN FD tunnel) mode the AF bit 30 (BRS) is ignored at reception time, frames with AF bit 31 (CiA 611-1 ZDLC, zero data length) are dropped.",
+	  "protocolrx.c:isotp_check_frame_head() CAN_CIA_SDT_ZDLC",
+	  "DEVIATION (if observed): tunneled ZDLC frames are processed (fixed by xl-isotp patch 35)."),
 	T("XL-HDR-005", "11 bit AF", 0, xl_rx_sff_af, NULL,
 	  "An 11 bit rx_addr is used as AF without bit 29; frames with the same address and bit 29 are ignored.",
 	  "isotp.c:isotp_bind_xl(), protocolrx.c:isotp_check_frame_head()", NULL),
@@ -730,6 +767,11 @@ static const struct ft_test tests[] = {
 	  NULL,
 	  "CAN CC and CAN FD sockets bound to a CAN XL interface ignore CAN XL frames.",
 	  "protocolrx.c:isotp_check_frame_head()", NULL),
+	T("XL-HDR-007", "AF bits 30/31 (SDT 6)", 0, xl_rx_af_bits,
+	  &((const struct af_bits_param){ "XL6-8", false, false }),
+	  "In SDT 6 (CAN CC tunnel) mode frames with AF bit 30 (CiA 611-1 RTR) or bit 31 (ZDLC, zero data length) are dropped.",
+	  "protocolrx.c:isotp_check_frame_head() CAN_CIA_SDT6_RTR, CAN_CIA_SDT_ZDLC",
+	  "DEVIATION (if observed): tunneled RTR/ZDLC frames are processed (fixed by xl-isotp patch 35)."),
 	T("XL-SF-001", "CAN XL SF format", 0, xl_sf_native, NULL,
 	  "CAN XL PDUs (SDT 9, no CAN FD LL) use the 4 bit SF_DL for CAN_DL <= 8. For CAN_DL > 8 the N_PCI is 0x08 | SF_DL bits 10..8 followed by SF_DL bits 7..0 (SF_DL 1..CAN_DL-2); the CAN FD escape (0x00) and 4 bit SF_DL are ignored for CAN_DL > 8.",
 	  "protocolrx.c:isotp_rcv() N_PCI_XL_SF",

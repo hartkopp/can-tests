@@ -66,7 +66,8 @@ paths that are not reachable with virtual CAN interfaces.
 | | LISTEN_MODE: no FC after block | RX-FF-010-* |
 | `isotp_check_frame_head()` | XL: no CAN XL frame | XL-HDR-002 |
 | | XL: prio / flags / AF / SDT mismatch | XL-HDR-002, XL-HDR-005 |
-| | XL: AF bits 30/31 ignored | XL-HDR-003, XL-HDR-004 |
+| | XL: AF bits 30/31 ignored (SDT 9), BRS ignored (SDT 7) | XL-HDR-003, XL-HDR-004 |
+| | XL: tunneled ZDLC / RTR (SDT 6) frames dropped | XL-HDR-004, XL-HDR-007 |
 | | XL: VCID mismatch | XL-HDR-002 |
 | | XL: tunneled CC/FD frame length (SDT 6/7) | XL-SDT6-001, XL-SDT7-002 |
 | | CC/FD: CAN ID or frame type mismatch | RX-ID-003, TX-FC-015, XL-HDR-006 |

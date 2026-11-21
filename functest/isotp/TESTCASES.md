@@ -930,14 +930,21 @@ Parameterized test cases with the same behaviour are grouped.
 - **Behaviour:** A CAN XL frame is only processed if prio & 0x7FF == rx_id, VCID == rx_vcid, flags == rx_flags (exact match), (af & 0x3FFFFFFF) == rx_addr (29 bit address with bit 29) and sdt == sdt_mode. CAN CC/FD frames are ignored by CAN XL sockets.
 - **Code:** protocolrx.c:isotp_check_frame_head()
 
-### XL-HDR-003 .. XL-HDR-004 (2 variants)
+### XL-HDR-003
 
 **AF bits 30/31 ignored (SDT 9)**
 
-- **Variants:** `XL-HDR-003`, `XL-HDR-004`
-- **Behaviour:** The AF bits 30 (SDT 7 BRS) and 31 are ignored at reception time.
+- **Behaviour:** In SDT 9 mode the AF bits 30 and 31 are ignored at reception time.
 - **Code:** protocolrx.c:isotp_check_frame_head() CAN_CIA_ADDR_MASK
-- **ISO 15765-2:** REVIEW: AF bit 30/31 are ignored in all SDT modes (not only for SDT 7).
+- **ISO 15765-2:** REVIEW: AF bits 30/31 are not checked for native ISO 15765-2 N_PDUs (SDT 9).
+
+### XL-HDR-004
+
+**AF bits 30/31 (SDT 7)**
+
+- **Behaviour:** In SDT 7 (CAN FD tunnel) mode the AF bit 30 (BRS) is ignored at reception time, frames with AF bit 31 (CiA 611-1 ZDLC, zero data length) are dropped.
+- **Code:** protocolrx.c:isotp_check_frame_head() CAN_CIA_SDT_ZDLC
+- **ISO 15765-2:** DEVIATION (if observed): tunneled ZDLC frames are processed (fixed by xl-isotp patch 35).
 
 ### XL-HDR-005
 
@@ -952,6 +959,14 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** CAN CC and CAN FD sockets bound to a CAN XL interface ignore CAN XL frames.
 - **Code:** protocolrx.c:isotp_check_frame_head()
+
+### XL-HDR-007
+
+**AF bits 30/31 (SDT 6)**
+
+- **Behaviour:** In SDT 6 (CAN CC tunnel) mode frames with AF bit 30 (CiA 611-1 RTR) or bit 31 (ZDLC, zero data length) are dropped.
+- **Code:** protocolrx.c:isotp_check_frame_head() CAN_CIA_SDT6_RTR, CAN_CIA_SDT_ZDLC
+- **ISO 15765-2:** DEVIATION (if observed): tunneled RTR/ZDLC frames are processed (fixed by xl-isotp patch 35).
 
 ### XL-SF-001
 
