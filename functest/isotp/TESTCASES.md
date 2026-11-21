@@ -1297,8 +1297,8 @@ Parameterized test cases with the same behaviour are grouped.
 **netem delayed echo (STmin 10 ms)**
 
 - **Behaviour:** vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): a SF send() with WAIT_TX_DONE returns after the delayed echo. Expected: the separation time between CFs (STmin + frame_txtime) starts at the echo of the previous CF (gap = echo delay + STmin + frame_txtime). Observed behaviour is reported.
-- **Code:** protocoltx.c:isotp_send_cframe() alloc_skb()/can_skb_set_owner(), isotp_rcv_echo() skb->sk check, sch_netem.c:netem_enqueue() skb_orphan_partial()
-- **ISO 15765-2:** FINDING (if observed): netem with delay orphans the CF skbs (sock_efree destructor), the CF echo is not recognized and the transfer is aborted with ECOMM.
+- **Code:** protocoltx.c:isotp_send_cframe() alloc_skb()/can_skb_set_owner(), isotp_rcv_echo() skb->sk check, sch_netem.c:netem_enqueue(), sock.c:skb_orphan_partial()
+- **ISO 15765-2:** FINDING (if observed): netem with delay orphans the CF skbs (sock_efree destructor), the CF echo is not recognized and the transfer is aborted with ECOMM. Cause in net/core: skb_orphan_partial() does not keep already partially orphaned (sock_efree) skbs.
 - **Flags:** timing
 
 ### TIM-ECHO-007
@@ -1306,8 +1306,8 @@ Parameterized test cases with the same behaviour are grouped.
 **netem delayed echo (CF broadcast)**
 
 - **Behaviour:** vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): expected: in CF broadcast mode each frame (incl. the FF) is sent after the echo of the previous frame + frame_txtime. Observed behaviour is reported.
-- **Code:** protocoltx.c:isotp_send_cframe() alloc_skb()/can_skb_set_owner(), isotp_rcv_echo() skb->sk check, sch_netem.c:netem_enqueue() skb_orphan_partial()
-- **ISO 15765-2:** FINDING (if observed): netem with delay orphans the CF skbs (sock_efree destructor), the CF echo is not recognized and the transfer is aborted with ECOMM.
+- **Code:** protocoltx.c:isotp_send_cframe() alloc_skb()/can_skb_set_owner(), isotp_rcv_echo() skb->sk check, sch_netem.c:netem_enqueue(), sock.c:skb_orphan_partial()
+- **ISO 15765-2:** FINDING (if observed): netem with delay orphans the CF skbs (sock_efree destructor), the CF echo is not recognized and the transfer is aborted with ECOMM. Cause in net/core: skb_orphan_partial() does not keep already partially orphaned (sock_efree) skbs.
 - **Flags:** timing
 
 ### TIM-ECHO-008

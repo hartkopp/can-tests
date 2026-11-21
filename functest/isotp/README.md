@@ -87,10 +87,16 @@ sudo ./setup_vcan.sh -e up
 | vcaniso8 | netem delay 100ms | slow transmission confirmation (see FINDING below) |
 | vcaniso9 | tbf rate 2kbit | slow bus: 64 ms per CAN CC frame |
 
-netem orphans skbs when a delay is configured. The CF skbs of CAN_ISOTP
-(`alloc_skb()` + `can_skb_set_owner()`) lose `skb->sk` and their echo is
-not recognized by `isotp_rcv_echo()`; TIM-ECHO-006/007 report this as
-`# FINDING`. tbf keeps the socket reference.
+netem calls `skb_orphan_partial()` (net/core/sock.c) when a delay is
+configured. It keeps `skb->sk` only for skbs with the `sock_wfree`
+destructor, which are converted to `sock_efree` with a socket reference.
+The CF skbs of CAN_ISOTP (`alloc_skb()` + `can_skb_set_owner()`) already
+have this partially orphaned state (`sock_efree` + socket reference) but
+are fully orphaned and lose `skb->sk`. Their echo is then not recognized
+by `isotp_rcv_echo()`; TIM-ECHO-006/007 report this as `# FINDING`. The
+cause is in net/core, not in CAN_ISOTP: `skb_orphan_partial()` should
+keep skbs with the `sock_efree` destructor (see also the comment in
+net/tls/tls_device_fallback.c). tbf keeps the socket reference.
 
 The `echo` parameter applies to all vcan interfaces of the system. The
 script reloads the vcan module only if no other vcan interfaces than
