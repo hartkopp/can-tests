@@ -721,9 +721,13 @@ static void rx_ff_min(struct ft_ctx *ctx, const void *param)
 
 	ft_pattern(pdu, sizeof(pdu), 9);
 
-	/* encode a PDU with iso_min + 1 bytes and patch the FF_DL */
+	/* FF_DL >= FF_DLmin: encode the PDU with FF_DL bytes (exact CF lengths
+	 * as required for CAN XL N_PDUs), FF_DL < FF_DLmin: encode a PDU with
+	 * FF_DLmin bytes (as FF) and patch the FF_DL
+	 */
 	for (ffdl = fp->iso_min - 2; ffdl <= fp->iso_min + 1; ffdl++) {
-		n = ft_enc_pdu(&env.pe, &env.hrx, pdu, fp->iso_min + 1, &fr);
+		n = ft_enc_pdu(&env.pe, &env.hrx, pdu,
+			       ffdl < fp->iso_min ? fp->iso_min : ffdl, &fr);
 		ff = fr[0];
 		ff.data[env.pe.ae ? 1 : 0] = 0x10 | (ffdl >> 8);
 		ff.data[env.pe.ae ? 2 : 1] = ffdl & 0xFF;
