@@ -737,6 +737,15 @@ static void api_opt_ll(struct ft_ctx *ctx, const void *param)
  * ------------------------------------------------------------------------
  */
 
+/* true when a byte in buf is not zero */
+static bool memchr_inv0(const uint8_t *buf, size_t len)
+{
+	while (len--)
+		if (*buf++)
+			return true;
+	return false;
+}
+
 static void xl_valid(struct can_isotp_xl_options *xl)
 {
 	memset(xl, 0, sizeof(*xl));
@@ -861,6 +870,26 @@ static void api_opt_xl(struct ft_ctx *ctx, const void *param)
 		xl.rx_vcid = 255 - v;
 		CHECK_RET(ctx, set_opt(s, CAN_ISOTP_XL_OPTS, &xl, sizeof(xl)), 0);
 	}
+
+	/* reserved bytes must be zero (also when disabling the XL mode) */
+	for (v = 0; v < sizeof(xl.__res); v++) {
+		xl_valid(&xl);
+		xl.__res[v] = 0x01 << v;
+		CHECK_RET(ctx, set_opt(s, CAN_ISOTP_XL_OPTS, &xl, sizeof(xl)),
+			  -EINVAL);
+		xl.tx_flags = 0;
+		CHECK_RET(ctx, set_opt(s, CAN_ISOTP_XL_OPTS, &xl, sizeof(xl)),
+			  -EINVAL);
+	}
+	FT_CHECK(ctx, sizeof(xl) == 20, "sizeof(struct can_isotp_xl_options) %zu",
+		 sizeof(xl));
+	xl_valid(&xl);
+	CHECK_RET(ctx, set_opt(s, CAN_ISOTP_XL_OPTS, &xl, sizeof(xl)), 0);
+	memset(&get, 0xFF, sizeof(get));
+	len = sizeof(get);
+	CHECK_RET(ctx, get_opt(s, CAN_ISOTP_XL_OPTS, &get, &len), 0);
+	FT_CHECK(ctx, !memchr_inv0(get.__res, sizeof(get.__res)),
+		 "getsockopt() returns reserved bytes != 0");
 
 	/* rejected call keeps the former values */
 	xl_valid(&xl);
@@ -1985,7 +2014,7 @@ static const struct ft_test tests[] = {
 	  "isotp.c:isotp_setsockopt_locked() CAN_ISOTP_LL_OPTS",
 	  "REVIEW: CAN FD tx_flags are not validated (e.g. CANFD_ESI or undefined bits can be set)."),
 	T("API-OPT-011", "CAN_ISOTP_XL_OPTS validation", 0, api_opt_xl,
-	  "XL mode is enabled with CANXL_XLF in tx_flags. Then tx_flags and rx_flags may only contain XLF|SEC|RRS (rx_flags must contain XLF), tx_dl must be 8..2048, tx_addr/rx_addr must be valid 11/29 bit CAN IDs and sdt_mode must be 6, 7 or 9 (else EINVAL, options unchanged). VCIDs are not checked. Without XLF the call disables XL mode without further checks and only clears the stored tx_flags.",
+	  "XL mode is enabled with CANXL_XLF in tx_flags. Then tx_flags and rx_flags may only contain XLF|SEC|RRS (rx_flags must contain XLF), tx_dl must be 8..2048, tx_addr/rx_addr must be valid 11/29 bit CAN IDs and sdt_mode must be 6, 7 or 9 (else EINVAL, options unchanged). VCIDs are not checked. The reserved bytes (__res[3], struct size 20) must be zero, also when disabling the XL mode (else EINVAL); getsockopt() returns them as zero. Without XLF the call disables XL mode without further checks and only clears the stored tx_flags.",
 	  "isotp.c:isotp_setsockopt_locked() CAN_ISOTP_XL_OPTS", NULL),
 	T("API-OPT-012", "socket options on bound sockets", 0, api_opt_bound,
 	  "All socket options are rejected with EISCONN after bind() (the size check comes first). getsockopt() still works.",

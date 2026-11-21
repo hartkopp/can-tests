@@ -125,7 +125,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **CAN_ISOTP_XL_OPTS validation**
 
-- **Behaviour:** XL mode is enabled with CANXL_XLF in tx_flags. Then tx_flags and rx_flags may only contain XLF\|SEC\|RRS (rx_flags must contain XLF), tx_dl must be 8..2048, tx_addr/rx_addr must be valid 11/29 bit CAN IDs and sdt_mode must be 6, 7 or 9 (else EINVAL, options unchanged). VCIDs are not checked. Without XLF the call disables XL mode without further checks and only clears the stored tx_flags.
+- **Behaviour:** XL mode is enabled with CANXL_XLF in tx_flags. Then tx_flags and rx_flags may only contain XLF\|SEC\|RRS (rx_flags must contain XLF), tx_dl must be 8..2048, tx_addr/rx_addr must be valid 11/29 bit CAN IDs and sdt_mode must be 6, 7 or 9 (else EINVAL, options unchanged). VCIDs are not checked. The reserved bytes (__res[3], struct size 20) must be zero, also when disabling the XL mode (else EINVAL); getsockopt() returns them as zero. Without XLF the call disables XL mode without further checks and only clears the stored tx_flags.
 - **Code:** isotp.c:isotp_setsockopt_locked() CAN_ISOTP_XL_OPTS
 
 ### API-OPT-012
