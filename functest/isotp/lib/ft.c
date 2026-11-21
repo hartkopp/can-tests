@@ -867,6 +867,12 @@ bool ft_bcm_send_seq(struct ft_ctx *ctx, enum ft_if i,
 	  .ll_tx_dl = ((s) == CAN_CIA_FD_TUNNEL_SDT) ? (dl) : 8, \
 	  .xl = true, .sdt = s, .xl_tx_dl = dl,			\
 	  .xl_flags = CANXL_XLF | (fl), .tx_vcid = tv, .rx_vcid = rv }
+/* CAN FD N_PDUs in CAN XL frames with SDT 9 (LL mtu 72) */
+#define XL9FD_MODE(n, dl)					\
+	{ .name = n, .iface = FT_IF_XL, .mtu = CANFD_MTU,	\
+	  .ll_tx_dl = dl, .xl = true,				\
+	  .sdt = CAN_CIA_ISO15765_2_SDT, .xl_tx_dl = dl,	\
+	  .xl_flags = CANXL_XLF }
 #define XL7_BRS_MODE(n, dl)					\
 	{ .name = n, .iface = FT_IF_XL, .mtu = CANFD_MTU,	\
 	  .ll_tx_dl = dl, .ll_tx_flags = CANFD_BRS,		\
@@ -901,6 +907,8 @@ const struct ft_mode ft_modes[] = {
 		0, 0, 0),
 	XL_MODE("XL9-256-IF256", FT_IF_XL256, CAN_CIA_ISO15765_2_SDT, 256,
 		0, 0, 0),
+	XL9FD_MODE("XL9FD-12", 12),
+	XL9FD_MODE("XL9FD-64", 64),
 	XL_MODE("XL6-8", FT_IF_XL, CAN_CIA_CC_TUNNEL_SDT, 8, 0, 0, 0),
 	XL_MODE("XL7-8", FT_IF_XL, CAN_CIA_FD_TUNNEL_SDT, 8, 0, 0, 0),
 	XL_MODE("XL7-12", FT_IF_XL, CAN_CIA_FD_TUNNEL_SDT, 12, 0, 0, 0),
@@ -1010,8 +1018,12 @@ bool ft_variant_valid(const struct ft_mode *m, int var)
 {
 	unsigned int dl = m->xl ? m->xl_tx_dl : m->ll_tx_dl;
 
-	if (var == FT_V_PAD || var == FT_V_AEPAD)
-		return dl <= 64 && ft_padlen(dl) == dl;
+	/* padding only for CAN CC/FD N_PDUs (no padding for CAN XL N_PDUs) */
+	if (var == FT_V_PAD || var == FT_V_AEPAD) {
+		if (m->mtu == CANFD_MTU)
+			return dl <= 64 && ft_padlen(dl) == dl;
+		return dl == CAN_MAX_DLEN;
+	}
 
 	return true;
 }
@@ -1308,6 +1320,10 @@ static unsigned int ft_enc_pad(const struct ft_enc *e, uint8_t *buf,
 			       unsigned int datalen)
 {
 	unsigned int plen;
+
+	/* CAN XL N_PDUs (LL_DL > 8) are not padded */
+	if (e->xlsf && e->ll_dl > CAN_MAX_DLEN)
+		return datalen;
 
 	if (!(e->pad || (e->fd && datalen > CAN_MAX_DLEN)))
 		return datalen;

@@ -203,7 +203,8 @@ All test cases are parameterized over link layer modes
 |---|---|
 | `CC8` | CAN CC, TX_DL 8 |
 | `FD8` .. `FD64`, `FD64BRS` | CAN FD with TX_DL 8..64 (BRS) |
-| `XL9-<n>` | CAN XL SDT 9 (native ISO 15765-2), TX_DL n (8..2048) |
+| `XL9-<n>` | CAN XL SDT 9 (native ISO 15765-2), TX_DL n (8..2048), CAN CC N_PDU (n = 8) or CAN XL N_PDU (n > 8, no padding) |
+| `XL9FD-12`, `XL9FD-64` | CAN XL SDT 9 with CAN FD N_PDUs (LL mtu 72) |
 | `XL9-2048-SEC-VCID`, `XL9-100-RRS` | CAN XL with SEC/RRS flags and VCIDs |
 | `XL9-512-IF512`, `XL9-256-IF256` | CAN XL on interfaces with smaller MTU |
 | `XL6-8` | CAN XL SDT 6 (CAN CC tunnel) |
@@ -211,7 +212,7 @@ All test cases are parameterized over link layer modes
 
 and variants: `PLAIN`, `AE` (extended addressing), `PAD` (TX padding
 0x55, RX padding checks 0xAA), `AEPAD` (separate rx address extension +
-padding).
+padding). The padding variants are only used for CAN CC/FD N_PDUs.
 
 ## Notes
 

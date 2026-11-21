@@ -1170,16 +1170,21 @@ static void api_bind_lldl(struct ft_ctx *ctx, const void *param)
 		uint8_t mtu;
 		int ret;
 	} tc[] = {
-		/* TX_PADDING requires a valid CAN FD length */
-		{ "XL9-64", CAN_ISOTP_TX_PADDING, 64, CAN_MTU, 0 },
+		/* LL mtu 16: TX_PADDING only for CAN CC N_PDUs (TX_DL 8) */
+		{ "XL9-64", CAN_ISOTP_TX_PADDING, 8, CAN_MTU, 0 },
+		{ "XL9-64", CAN_ISOTP_TX_PADDING, 64, CAN_MTU, -EINVAL },
+		{ "XL9-64", CAN_ISOTP_TX_PADDING, 12, CAN_MTU, -EINVAL },
 		{ "XL9-64", CAN_ISOTP_TX_PADDING, 100, CAN_MTU, -EINVAL },
 		{ "XL9-64", CAN_ISOTP_TX_PADDING, 9, CAN_MTU, -EINVAL },
 		{ "XL9-64", CAN_ISOTP_TX_PADDING, 2048, CAN_MTU, -EINVAL },
 		{ "XL9-64", 0, 100, CAN_MTU, 0 },
-		/* CAN FD PDU (LL mtu 72) inside CAN XL SDT 9 */
+		/* CAN FD N_PDU (LL mtu 72) inside CAN XL SDT 9 */
 		{ "XL9-64", 0, 64, CANFD_MTU, 0 },
+		{ "XL9-64", CAN_ISOTP_TX_PADDING, 64, CANFD_MTU, 0 },
+		{ "XL9-64", CAN_ISOTP_TX_PADDING, 12, CANFD_MTU, 0 },
 		{ "XL9-64", 0, 100, CANFD_MTU, -EINVAL },
 		{ "XL9-64", 0, 13, CANFD_MTU, -EINVAL },
+		{ "XL9-64", 0, 2048, CANFD_MTU, -EINVAL },
 	};
 	struct ft_isotp_cfg c;
 	unsigned int i;
@@ -2005,8 +2010,8 @@ static const struct ft_test tests[] = {
 	  "The interface MTU must be >= the LL mtu: a CAN FD socket on a CAN CC interface fails with EINVAL, a CAN CC socket on a CAN FD interface and a CAN FD socket on a CAN XL interface are accepted.",
 	  "isotp.c:isotp_bind() dev->mtu < so->ll.mtu", NULL),
 	T("API-BIND-007", "bind(): padding and LL_DL", 0, api_bind_lldl,
-	  "With CAN_ISOTP_TX_PADDING or LL mtu 72 (CAN FD PDU) the effective TX_DL (also from CAN_ISOTP_XL_OPTS) must be a CAN FD DLC length (else EINVAL at bind()).",
-	  "isotp.c:isotp_bind()", NULL),
+	  "Padding is only defined for CAN CC/FD N_PDUs: with LL mtu 72 (CAN FD N_PDU) the effective TX_DL (also from CAN_ISOTP_XL_OPTS) must be a CAN FD DLC length; with LL mtu 16 CAN_ISOTP_TX_PADDING requires a TX_DL of 8 (CAN CC N_PDU), a CAN XL N_PDU (TX_DL > 8) is not padded (else EINVAL at bind()).",
+	  "isotp.c:isotp_bind() fd_pdu()", NULL),
 	T("API-BIND-008", "bind(): CAN XL settings", 0, api_bind_xl,
 	  "In XL mode tx_id/rx_id must be 11 bit IDs (XL priority), SDT 7 requires LL mtu 72, SDT 6 requires LL mtu 16 and a TX_DL of 8 (else EINVAL). These checks come before the interface lookup.",
 	  "isotp.c:isotp_bind(), isotp_bind_xl()", NULL),

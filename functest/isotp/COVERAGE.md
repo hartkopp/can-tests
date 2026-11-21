@@ -37,6 +37,7 @@ paths that are not reachable with virtual CAN interfaces.
 | `isotp_rcv_sf()` | SF_DL 0 / SF_DL > CAN_DL - PCI | RX-SF-002, RX-SF-009, XL-SF-001 |
 | | unsigned underflow (CAN_DL < AE + PCI) | RX-SF-003, RX-SF-004, RX-SF-005 (DEVIATION) |
 | | padding check fail => EBADMSG | RX-SF-011, XL-SF-002 |
+| | CAN XL N_PDUs: no padding checks | XL-SF-002, TX-FC-011 |
 | | terminates an ongoing reception | RX-SF-012, RX-SF-013, RX-SF-014 |
 | | alloc_skb() failure | *n/c* |
 | `isotp_rcv_ff()` | CAN_DL < 8 | RX-FF-001, RX-FF-008 |
@@ -77,8 +78,8 @@ paths that are not reachable with virtual CAN interfaces.
 | | HALF_DUPLEX: non-FC during tx | TX-HD-002, TX-HD-004, E2E-HD-001 |
 | | HALF_DUPLEX: FC during rx | TX-HD-004 |
 | | SF CAN_DL <= 8 | RX-SF-001, RX-SF-002 |
-| | SF CAN XL: forced 11 bit SF_DL with padding | XL-SF-002 |
-| | SF CAN XL: N_PCI bit 3 | XL-SF-001, TX-SEG-XL9-* (rx: RX-SEG-XL9-*) |
+| | SF CAN XL N_PDU: N_PCI bit 3 | XL-SF-001, XL-SF-002, TX-SEG-XL9-* (rx: RX-SEG-XL9-*) |
+| | SF CAN FD N_PDU in CAN XL: escape only | XL-SDT7-003, XL-SDT9-001 |
 | | SF CAN FD escape | RX-SF-008, RX-SF-009, RX-SF-010 |
 | | MF without LISTEN_MODE ignored | RX-MF-001, E2E-MC-MF-* |
 | | MF with LISTEN_MODE | RX-MF-002, E2E-MC-MF-* |
@@ -163,10 +164,11 @@ paths that are not reachable with virtual CAN interfaces.
 | `isotp_bind_xl()` | 29 bit AF translation | XL-HDR-001, XL-HDR-002, XL-HDR-005 |
 | | SDT 7 without CAN FD LL | API-BIND-008 |
 | | SDT 7 BRS in AF | XL-HDR-001, TX-SEG-XL7-64BRS-* |
+| | CAN FD N_PDUs in SDT 9 (LL mtu 72) | XL-SDT9-001, TX-SEG-XL9FD-*, RX-SEG-XL9FD-*, E2E-XL9FD-* |
 | | SDT 6 without CAN CC LL / TX_DL != 8 | API-BIND-008 |
 | `isotp_bind()` | address length / family | API-BIND-001 |
 | | invalid tx_id / rx_id | API-BIND-002, API-BIND-003 |
-| | padding and TX_DL | API-BIND-007 |
+| | padding and TX_DL (no padding for CAN XL N_PDUs) | API-BIND-007 |
 | | XL with 29 bit CAN IDs | API-BIND-008 |
 | | ifindex 0 | API-BIND-005 |
 | | already bound | API-BIND-001 |

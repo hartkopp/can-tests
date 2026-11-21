@@ -181,8 +181,8 @@ Parameterized test cases with the same behaviour are grouped.
 
 **bind(): padding and LL_DL**
 
-- **Behaviour:** With CAN_ISOTP_TX_PADDING or LL mtu 72 (CAN FD PDU) the effective TX_DL (also from CAN_ISOTP_XL_OPTS) must be a CAN FD DLC length (else EINVAL at bind()).
-- **Code:** isotp.c:isotp_bind()
+- **Behaviour:** Padding is only defined for CAN CC/FD N_PDUs: with LL mtu 72 (CAN FD N_PDU) the effective TX_DL (also from CAN_ISOTP_XL_OPTS) must be a CAN FD DLC length; with LL mtu 16 CAN_ISOTP_TX_PADDING requires a TX_DL of 8 (CAN CC N_PDU), a CAN XL N_PDU (TX_DL > 8) is not padded (else EINVAL at bind()).
+- **Code:** isotp.c:isotp_bind() fd_pdu()
 
 ### API-BIND-008
 
@@ -293,11 +293,11 @@ Parameterized test cases with the same behaviour are grouped.
 
 ## tx
 
-### TX-SEG-CC8-PLAIN .. TX-SEG-XL7-64BRS-AEPAD (92 variants)
+### TX-SEG-CC8-PLAIN .. TX-SEG-XL7-64BRS-AEPAD (96 variants)
 
 **segmentation CC8 PLAIN**
 
-- **Variants:** `TX-SEG-CC8-PLAIN`, `TX-SEG-CC8-AE`, `TX-SEG-CC8-PAD`, `TX-SEG-CC8-AEPAD`, `TX-SEG-FD8-PLAIN`, `TX-SEG-FD8-AE`, `TX-SEG-FD8-PAD`, `TX-SEG-FD8-AEPAD`, `TX-SEG-FD12-PLAIN`, `TX-SEG-FD12-AE`, `TX-SEG-FD12-PAD`, `TX-SEG-FD12-AEPAD`, `TX-SEG-FD16-PLAIN`, `TX-SEG-FD16-AE`, `TX-SEG-FD16-PAD`, `TX-SEG-FD16-AEPAD`, `TX-SEG-FD20-PLAIN`, `TX-SEG-FD20-AE`, `TX-SEG-FD20-PAD`, `TX-SEG-FD20-AEPAD`, `TX-SEG-FD24-PLAIN`, `TX-SEG-FD24-AE`, `TX-SEG-FD24-PAD`, `TX-SEG-FD24-AEPAD`, `TX-SEG-FD32-PLAIN`, `TX-SEG-FD32-AE`, `TX-SEG-FD32-PAD`, `TX-SEG-FD32-AEPAD`, `TX-SEG-FD48-PLAIN`, `TX-SEG-FD48-AE`, `TX-SEG-FD48-PAD`, `TX-SEG-FD48-AEPAD`, `TX-SEG-FD64-PLAIN`, `TX-SEG-FD64-AE`, `TX-SEG-FD64-PAD`, `TX-SEG-FD64-AEPAD`, `TX-SEG-FD64BRS-PLAIN`, `TX-SEG-FD64BRS-AE`, `TX-SEG-FD64BRS-PAD`, `TX-SEG-FD64BRS-AEPAD`, `TX-SEG-XL9-8-PLAIN`, `TX-SEG-XL9-8-AE`, `TX-SEG-XL9-8-PAD`, `TX-SEG-XL9-8-AEPAD`, `TX-SEG-XL9-9-PLAIN`, `TX-SEG-XL9-9-AE`, `TX-SEG-XL9-12-PLAIN`, `TX-SEG-XL9-12-AE`, `TX-SEG-XL9-12-PAD`, `TX-SEG-XL9-12-AEPAD`, `TX-SEG-XL9-64-PLAIN`, `TX-SEG-XL9-64-AE`, `TX-SEG-XL9-64-PAD`, `TX-SEG-XL9-64-AEPAD`, `TX-SEG-XL9-65-PLAIN`, `TX-SEG-XL9-65-AE`, `TX-SEG-XL9-255-PLAIN`, `TX-SEG-XL9-255-AE`, `TX-SEG-XL9-256-PLAIN`, `TX-SEG-XL9-256-AE`, `TX-SEG-XL9-1000-PLAIN`, `TX-SEG-XL9-1000-AE`, `TX-SEG-XL9-2048-PLAIN`, `TX-SEG-XL9-2048-AE`, `TX-SEG-XL9-2048-SEC-VCID-PLAIN`, `TX-SEG-XL9-2048-SEC-VCID-AE`, `TX-SEG-XL9-100-RRS-PLAIN`, `TX-SEG-XL9-100-RRS-AE`, `TX-SEG-XL9-512-IF512-PLAIN`, `TX-SEG-XL9-512-IF512-AE`, `TX-SEG-XL9-256-IF256-PLAIN`, `TX-SEG-XL9-256-IF256-AE`, `TX-SEG-XL6-8-PLAIN`, `TX-SEG-XL6-8-AE`, `TX-SEG-XL6-8-PAD`, `TX-SEG-XL6-8-AEPAD`, `TX-SEG-XL7-8-PLAIN`, `TX-SEG-XL7-8-AE`, `TX-SEG-XL7-8-PAD`, `TX-SEG-XL7-8-AEPAD`, `TX-SEG-XL7-12-PLAIN`, `TX-SEG-XL7-12-AE`, `TX-SEG-XL7-12-PAD`, `TX-SEG-XL7-12-AEPAD`, `TX-SEG-XL7-64-PLAIN`, `TX-SEG-XL7-64-AE`, `TX-SEG-XL7-64-PAD`, `TX-SEG-XL7-64-AEPAD`, `TX-SEG-XL7-64BRS-PLAIN`, `TX-SEG-XL7-64BRS-AE`, `TX-SEG-XL7-64BRS-PAD`, `TX-SEG-XL7-64BRS-AEPAD`
+- **Variants:** `TX-SEG-CC8-PLAIN`, `TX-SEG-CC8-AE`, `TX-SEG-CC8-PAD`, `TX-SEG-CC8-AEPAD`, `TX-SEG-FD8-PLAIN`, `TX-SEG-FD8-AE`, `TX-SEG-FD8-PAD`, `TX-SEG-FD8-AEPAD`, `TX-SEG-FD12-PLAIN`, `TX-SEG-FD12-AE`, `TX-SEG-FD12-PAD`, `TX-SEG-FD12-AEPAD`, `TX-SEG-FD16-PLAIN`, `TX-SEG-FD16-AE`, `TX-SEG-FD16-PAD`, `TX-SEG-FD16-AEPAD`, `TX-SEG-FD20-PLAIN`, `TX-SEG-FD20-AE`, `TX-SEG-FD20-PAD`, `TX-SEG-FD20-AEPAD`, `TX-SEG-FD24-PLAIN`, `TX-SEG-FD24-AE`, `TX-SEG-FD24-PAD`, `TX-SEG-FD24-AEPAD`, `TX-SEG-FD32-PLAIN`, `TX-SEG-FD32-AE`, `TX-SEG-FD32-PAD`, `TX-SEG-FD32-AEPAD`, `TX-SEG-FD48-PLAIN`, `TX-SEG-FD48-AE`, `TX-SEG-FD48-PAD`, `TX-SEG-FD48-AEPAD`, `TX-SEG-FD64-PLAIN`, `TX-SEG-FD64-AE`, `TX-SEG-FD64-PAD`, `TX-SEG-FD64-AEPAD`, `TX-SEG-FD64BRS-PLAIN`, `TX-SEG-FD64BRS-AE`, `TX-SEG-FD64BRS-PAD`, `TX-SEG-FD64BRS-AEPAD`, `TX-SEG-XL9-8-PLAIN`, `TX-SEG-XL9-8-AE`, `TX-SEG-XL9-8-PAD`, `TX-SEG-XL9-8-AEPAD`, `TX-SEG-XL9-9-PLAIN`, `TX-SEG-XL9-9-AE`, `TX-SEG-XL9-12-PLAIN`, `TX-SEG-XL9-12-AE`, `TX-SEG-XL9-64-PLAIN`, `TX-SEG-XL9-64-AE`, `TX-SEG-XL9-65-PLAIN`, `TX-SEG-XL9-65-AE`, `TX-SEG-XL9-255-PLAIN`, `TX-SEG-XL9-255-AE`, `TX-SEG-XL9-256-PLAIN`, `TX-SEG-XL9-256-AE`, `TX-SEG-XL9-1000-PLAIN`, `TX-SEG-XL9-1000-AE`, `TX-SEG-XL9-2048-PLAIN`, `TX-SEG-XL9-2048-AE`, `TX-SEG-XL9-2048-SEC-VCID-PLAIN`, `TX-SEG-XL9-2048-SEC-VCID-AE`, `TX-SEG-XL9-100-RRS-PLAIN`, `TX-SEG-XL9-100-RRS-AE`, `TX-SEG-XL9-512-IF512-PLAIN`, `TX-SEG-XL9-512-IF512-AE`, `TX-SEG-XL9-256-IF256-PLAIN`, `TX-SEG-XL9-256-IF256-AE`, `TX-SEG-XL9FD-12-PLAIN`, `TX-SEG-XL9FD-12-AE`, `TX-SEG-XL9FD-12-PAD`, `TX-SEG-XL9FD-12-AEPAD`, `TX-SEG-XL9FD-64-PLAIN`, `TX-SEG-XL9FD-64-AE`, `TX-SEG-XL9FD-64-PAD`, `TX-SEG-XL9FD-64-AEPAD`, `TX-SEG-XL6-8-PLAIN`, `TX-SEG-XL6-8-AE`, `TX-SEG-XL6-8-PAD`, `TX-SEG-XL6-8-AEPAD`, `TX-SEG-XL7-8-PLAIN`, `TX-SEG-XL7-8-AE`, `TX-SEG-XL7-8-PAD`, `TX-SEG-XL7-8-AEPAD`, `TX-SEG-XL7-12-PLAIN`, `TX-SEG-XL7-12-AE`, `TX-SEG-XL7-12-PAD`, `TX-SEG-XL7-12-AEPAD`, `TX-SEG-XL7-64-PLAIN`, `TX-SEG-XL7-64-AE`, `TX-SEG-XL7-64-PAD`, `TX-SEG-XL7-64-AEPAD`, `TX-SEG-XL7-64BRS-PLAIN`, `TX-SEG-XL7-64BRS-AE`, `TX-SEG-XL7-64BRS-PAD`, `TX-SEG-XL7-64BRS-AEPAD`
 - **Behaviour:** The DUT segments PDUs of all relevant lengths (1, 2, SF boundaries, FF with 1..n CFs, SN wrap around, 4095 (12 bit FF_DL), 4096 (32 bit FF_DL escape), 8300) into SF/FF/CF frames with the exact layout of the reference encoder: SF with 4 bit SF_DL for TX_DL 8 or SF_DL <= 7-ae, else SF with escape (0x00 + SF_DL byte for CAN FD PDUs, 0x08\|SF_DL>>8 + low byte for CAN XL PDUs); FF uses the full TX_DL with 12 bit FF_DL (<= 4095) or 32 bit FF_DL; CFs carry SN 1..15,0,.. and use TX_DL except the last one; the last CF/SF is padded to the next CAN FD DLC length with CAN_ISOTP_TX_PADDING (content txpad_content) or for CAN FD PDUs > 8 byte (content 0xCC). Block size (FC.BS) is honoured. With CAN_ISOTP_WAIT_TX_DONE send() returns the PDU length after the last frame was sent. CAN FD frames carry FDF\|ll.tx_flags, CAN XL frames the configured prio/VCID/flags/SDT/AF.
 - **Code:** protocoltx.c:isotp_sendmsg(), isotp_sf_ff_pci(), isotp_ff_pci(), isotp_send_cframe(), get_padlength(), isotp_fill_frame_head(), protocolrx.c:isotp_rcv_fc(), isotp_rcv_echo()
 
@@ -383,7 +383,7 @@ Parameterized test cases with the same behaviour are grouped.
 - **Variants:** `TX-FC-010-plain`, `TX-FC-010-ae`
 - **Behaviour:** A frame without N_PCI (CAN_DL < 1, +1 with extended addressing) is no N_PDU and is ignored. A FC with N_PCI and CAN_DL < 3 (+1 with extended addressing) aborts the transfer with EBADMSG. Data bytes beyond CAN_DL are not used.
 - **Code:** protocolrx.c:isotp_rcv() N_PCI length check, isotp_rcv_fc()
-- **ISO 15765-2:** DEVIATION (if observed): a FC without N_PCI is processed with data beyond CAN_DL (EBADMSG), fixed by xl-isotp patch 31.
+- **ISO 15765-2:** DEVIATION (if observed): a FC without N_PCI is processed with data beyond CAN_DL (EBADMSG), fixed by xl-isotp split_v2 patch 14.
 
 ### TX-FC-011
 
@@ -551,11 +551,11 @@ Parameterized test cases with the same behaviour are grouped.
 
 ## rx
 
-### RX-SEG-CC8-PLAIN .. RX-SEG-XL7-64BRS-AEPAD (86 variants)
+### RX-SEG-CC8-PLAIN .. RX-SEG-XL7-64BRS-AEPAD (90 variants)
 
 **reassembly CC8 PLAIN**
 
-- **Variants:** `RX-SEG-CC8-PLAIN`, `RX-SEG-CC8-AE`, `RX-SEG-CC8-PAD`, `RX-SEG-CC8-AEPAD`, `RX-SEG-FD8-PLAIN`, `RX-SEG-FD8-AE`, `RX-SEG-FD8-PAD`, `RX-SEG-FD8-AEPAD`, `RX-SEG-FD12-PLAIN`, `RX-SEG-FD12-AE`, `RX-SEG-FD12-PAD`, `RX-SEG-FD12-AEPAD`, `RX-SEG-FD16-PLAIN`, `RX-SEG-FD16-AE`, `RX-SEG-FD16-PAD`, `RX-SEG-FD16-AEPAD`, `RX-SEG-FD20-PLAIN`, `RX-SEG-FD20-AE`, `RX-SEG-FD20-PAD`, `RX-SEG-FD20-AEPAD`, `RX-SEG-FD24-PLAIN`, `RX-SEG-FD24-AE`, `RX-SEG-FD24-PAD`, `RX-SEG-FD24-AEPAD`, `RX-SEG-FD32-PLAIN`, `RX-SEG-FD32-AE`, `RX-SEG-FD32-PAD`, `RX-SEG-FD32-AEPAD`, `RX-SEG-FD48-PLAIN`, `RX-SEG-FD48-AE`, `RX-SEG-FD48-PAD`, `RX-SEG-FD48-AEPAD`, `RX-SEG-FD64-PLAIN`, `RX-SEG-FD64-AE`, `RX-SEG-FD64-PAD`, `RX-SEG-FD64-AEPAD`, `RX-SEG-XL9-8-PLAIN`, `RX-SEG-XL9-8-AE`, `RX-SEG-XL9-8-PAD`, `RX-SEG-XL9-8-AEPAD`, `RX-SEG-XL9-9-PLAIN`, `RX-SEG-XL9-9-AE`, `RX-SEG-XL9-12-PLAIN`, `RX-SEG-XL9-12-AE`, `RX-SEG-XL9-12-PAD`, `RX-SEG-XL9-12-AEPAD`, `RX-SEG-XL9-64-PLAIN`, `RX-SEG-XL9-64-AE`, `RX-SEG-XL9-64-PAD`, `RX-SEG-XL9-64-AEPAD`, `RX-SEG-XL9-65-PLAIN`, `RX-SEG-XL9-65-AE`, `RX-SEG-XL9-255-PLAIN`, `RX-SEG-XL9-255-AE`, `RX-SEG-XL9-1000-PLAIN`, `RX-SEG-XL9-1000-AE`, `RX-SEG-XL9-2048-PLAIN`, `RX-SEG-XL9-2048-AE`, `RX-SEG-XL9-2048-SEC-VCID-PLAIN`, `RX-SEG-XL9-2048-SEC-VCID-AE`, `RX-SEG-XL9-100-RRS-PLAIN`, `RX-SEG-XL9-100-RRS-AE`, `RX-SEG-XL9-512-IF512-PLAIN`, `RX-SEG-XL9-512-IF512-AE`, `RX-SEG-XL9-256-IF256-PLAIN`, `RX-SEG-XL9-256-IF256-AE`, `RX-SEG-XL6-8-PLAIN`, `RX-SEG-XL6-8-AE`, `RX-SEG-XL6-8-PAD`, `RX-SEG-XL6-8-AEPAD`, `RX-SEG-XL7-8-PLAIN`, `RX-SEG-XL7-8-AE`, `RX-SEG-XL7-8-PAD`, `RX-SEG-XL7-8-AEPAD`, `RX-SEG-XL7-12-PLAIN`, `RX-SEG-XL7-12-AE`, `RX-SEG-XL7-12-PAD`, `RX-SEG-XL7-12-AEPAD`, `RX-SEG-XL7-64-PLAIN`, `RX-SEG-XL7-64-AE`, `RX-SEG-XL7-64-PAD`, `RX-SEG-XL7-64-AEPAD`, `RX-SEG-XL7-64BRS-PLAIN`, `RX-SEG-XL7-64BRS-AE`, `RX-SEG-XL7-64BRS-PAD`, `RX-SEG-XL7-64BRS-AEPAD`
+- **Variants:** `RX-SEG-CC8-PLAIN`, `RX-SEG-CC8-AE`, `RX-SEG-CC8-PAD`, `RX-SEG-CC8-AEPAD`, `RX-SEG-FD8-PLAIN`, `RX-SEG-FD8-AE`, `RX-SEG-FD8-PAD`, `RX-SEG-FD8-AEPAD`, `RX-SEG-FD12-PLAIN`, `RX-SEG-FD12-AE`, `RX-SEG-FD12-PAD`, `RX-SEG-FD12-AEPAD`, `RX-SEG-FD16-PLAIN`, `RX-SEG-FD16-AE`, `RX-SEG-FD16-PAD`, `RX-SEG-FD16-AEPAD`, `RX-SEG-FD20-PLAIN`, `RX-SEG-FD20-AE`, `RX-SEG-FD20-PAD`, `RX-SEG-FD20-AEPAD`, `RX-SEG-FD24-PLAIN`, `RX-SEG-FD24-AE`, `RX-SEG-FD24-PAD`, `RX-SEG-FD24-AEPAD`, `RX-SEG-FD32-PLAIN`, `RX-SEG-FD32-AE`, `RX-SEG-FD32-PAD`, `RX-SEG-FD32-AEPAD`, `RX-SEG-FD48-PLAIN`, `RX-SEG-FD48-AE`, `RX-SEG-FD48-PAD`, `RX-SEG-FD48-AEPAD`, `RX-SEG-FD64-PLAIN`, `RX-SEG-FD64-AE`, `RX-SEG-FD64-PAD`, `RX-SEG-FD64-AEPAD`, `RX-SEG-XL9-8-PLAIN`, `RX-SEG-XL9-8-AE`, `RX-SEG-XL9-8-PAD`, `RX-SEG-XL9-8-AEPAD`, `RX-SEG-XL9-9-PLAIN`, `RX-SEG-XL9-9-AE`, `RX-SEG-XL9-12-PLAIN`, `RX-SEG-XL9-12-AE`, `RX-SEG-XL9-64-PLAIN`, `RX-SEG-XL9-64-AE`, `RX-SEG-XL9-65-PLAIN`, `RX-SEG-XL9-65-AE`, `RX-SEG-XL9-255-PLAIN`, `RX-SEG-XL9-255-AE`, `RX-SEG-XL9-1000-PLAIN`, `RX-SEG-XL9-1000-AE`, `RX-SEG-XL9-2048-PLAIN`, `RX-SEG-XL9-2048-AE`, `RX-SEG-XL9-2048-SEC-VCID-PLAIN`, `RX-SEG-XL9-2048-SEC-VCID-AE`, `RX-SEG-XL9-100-RRS-PLAIN`, `RX-SEG-XL9-100-RRS-AE`, `RX-SEG-XL9-512-IF512-PLAIN`, `RX-SEG-XL9-512-IF512-AE`, `RX-SEG-XL9-256-IF256-PLAIN`, `RX-SEG-XL9-256-IF256-AE`, `RX-SEG-XL9FD-12-PLAIN`, `RX-SEG-XL9FD-12-AE`, `RX-SEG-XL9FD-12-PAD`, `RX-SEG-XL9FD-12-AEPAD`, `RX-SEG-XL9FD-64-PLAIN`, `RX-SEG-XL9FD-64-AE`, `RX-SEG-XL9FD-64-PAD`, `RX-SEG-XL9FD-64-AEPAD`, `RX-SEG-XL6-8-PLAIN`, `RX-SEG-XL6-8-AE`, `RX-SEG-XL6-8-PAD`, `RX-SEG-XL6-8-AEPAD`, `RX-SEG-XL7-8-PLAIN`, `RX-SEG-XL7-8-AE`, `RX-SEG-XL7-8-PAD`, `RX-SEG-XL7-8-AEPAD`, `RX-SEG-XL7-12-PLAIN`, `RX-SEG-XL7-12-AE`, `RX-SEG-XL7-12-PAD`, `RX-SEG-XL7-12-AEPAD`, `RX-SEG-XL7-64-PLAIN`, `RX-SEG-XL7-64-AE`, `RX-SEG-XL7-64-PAD`, `RX-SEG-XL7-64-AEPAD`, `RX-SEG-XL7-64BRS-PLAIN`, `RX-SEG-XL7-64BRS-AE`, `RX-SEG-XL7-64BRS-PAD`, `RX-SEG-XL7-64BRS-AEPAD`
 - **Behaviour:** The DUT reassembles PDUs of all relevant lengths sent with the DUT TX_DL as LL_DL and the DUT rx addressing/padding settings. After a FF the DUT sends FC.CTS with BS/STmin from CAN_ISOTP_RECV_FC (ext_address and TX_PADDING as for all tx frames) and after every BS CFs another FC. The PDU is delivered with recv() after the last CF without socket error. Variants: plain (BS 0), ae (BS 3), pad (BS 1, RX_PADDING\|CHK_PAD_LEN\|CHK_PAD_DATA), aepad (BS 15).
 - **Code:** protocolrx.c:isotp_rcv(), isotp_rcv_sf(), isotp_rcv_ff(), isotp_rcv_cf(), protocoltx.c:isotp_send_fc()
 
@@ -693,7 +693,7 @@ Parameterized test cases with the same behaviour are grouped.
 - **Variants:** `RX-FF-004-CC8`, `RX-FF-004-CC8-ae`, `RX-FF-004-FD64`, `RX-FF-004-XL9-2048`
 - **Behaviour:** A FF with FF_DL < FF_DLmin (the PDU fits into a SF of the sender LL_DL: 7-ae for LL_DL 8, LL_DL-2-ae else) is ignored, FF_DL >= FF_DLmin is answered with a FC.
 - **Code:** protocolrx.c:isotp_rcv_ff() FF_DLmin check
-- **ISO 15765-2:** DEVIATION (if observed): CAN CC FF_DL 7 (normal) / 6 (extended addressing) is accepted although it fits into a SF (ISO 15765-2 FF_DLmin 8 / 7), fixed by xl-isotp patch 33.
+- **ISO 15765-2:** DEVIATION (if observed): CAN CC FF_DL 7 (normal) / 6 (extended addressing) is accepted although it fits into a SF (ISO 15765-2 FF_DLmin 8 / 7), fixed by xl-isotp split_v2 patch 16.
 
 ### RX-FF-005
 
@@ -708,7 +708,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** Expected: in CAN_ISOTP_LISTEN_MODE no frames are sent. Observed behaviour for a FF with FF_DL > max_pdu_size is reported.
 - **Code:** protocolrx.c:isotp_rcv_ff() isotp_send_fc(OVFLW) before the LISTEN_MODE check
-- **ISO 15765-2:** DEVIATION (if observed): a FC.OVFLW is sent in listen mode, which can abort transfers between other nodes (fixed by xl-isotp patch 34).
+- **ISO 15765-2:** DEVIATION (if observed): a FC.OVFLW is sent in listen mode, which can abort transfers between other nodes (fixed by xl-isotp split_v2 patch 18).
 
 ### RX-FF-011 .. RX-FF-011-ae (2 variants)
 
@@ -794,7 +794,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** Only the last CF may be shorter than LL_DL and it has to contain all remaining bytes of the PDU. A short CF lacking bytes (here 3 of 7) is ignored and the reception continues with the correct CF.
 - **Code:** protocolrx.c:isotp_rcv_cf() last CF length check
-- **ISO 15765-2:** DEVIATION (if observed): the short CF is accepted, consumes a SN and the reception waits for further CFs (fixed by xl-isotp patch 32).
+- **ISO 15765-2:** DEVIATION (if observed): the short CF is accepted, consumes a SN and the reception waits for further CFs (fixed by xl-isotp split_v2 patch 17).
 
 ### RX-CF-015
 
@@ -802,7 +802,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** A CF with only the N_PCI (no data) is a short CF lacking bytes and is ignored; the reception continues with the correct CF.
 - **Code:** protocolrx.c:isotp_rcv_cf() last CF length check
-- **ISO 15765-2:** DEVIATION (if observed): the empty CF is accepted and consumes a SN (fixed by xl-isotp patch 32).
+- **ISO 15765-2:** DEVIATION (if observed): the empty CF is accepted and consumes a SN (fixed by xl-isotp split_v2 patch 17).
 
 ### RX-CF-007-CC8 .. RX-CF-007-FD64 (2 variants)
 
@@ -944,7 +944,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** In SDT 7 (CAN FD tunnel) mode the AF bit 30 (BRS) is ignored at reception time, frames with AF bit 31 (CiA 611-1 ZDLC, zero data length) are dropped.
 - **Code:** protocolrx.c:isotp_check_frame_head() CAN_CIA_SDT_ZDLC
-- **ISO 15765-2:** DEVIATION (if observed): tunneled ZDLC frames are processed (fixed by xl-isotp patch 35).
+- **ISO 15765-2:** DEVIATION (if observed): tunneled ZDLC frames are processed (fixed by xl-isotp split_v2 patch 31).
 
 ### XL-HDR-005
 
@@ -966,7 +966,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** In SDT 6 (CAN CC tunnel) mode frames with AF bit 30 (CiA 611-1 RTR) or bit 31 (ZDLC, zero data length) are dropped.
 - **Code:** protocolrx.c:isotp_check_frame_head() CAN_CIA_SDT6_RTR, CAN_CIA_SDT_ZDLC
-- **ISO 15765-2:** DEVIATION (if observed): tunneled RTR/ZDLC frames are processed (fixed by xl-isotp patch 35).
+- **ISO 15765-2:** DEVIATION (if observed): tunneled RTR/ZDLC frames are processed (fixed by xl-isotp split_v2 patch 31).
 
 ### XL-SF-001
 
@@ -978,10 +978,10 @@ Parameterized test cases with the same behaviour are grouped.
 
 ### XL-SF-002
 
-**CAN XL SF with padding checks**
+**CAN XL N_PDUs with padding checks**
 
-- **Behaviour:** With RX_PADDING/CHK_PAD_* flags and a CAN_DL that is a CAN FD DLC length the 11 bit SF_DL format is used regardless of N_PCI bit 3 (so the CAN FD escape 0x00 + SF_DL is accepted); other lengths fail the padding check with EBADMSG.
-- **Code:** protocolrx.c:isotp_rcv() N_PCI_XL_SF, chk_pad_fail()
+- **Behaviour:** CAN XL N_PDUs (LL mtu 16, CAN_DL resp. RX_DL > 8) are not padded: with RX_PADDING/CHK_PAD_* flags SF with any CAN_DL > 8 and segmented PDUs with unpadded last CFs (also CAN_DL <= 8) are received without padding checks. A SF with CAN_DL > 8 always needs the XL SF PCI flag (the CAN FD escape 0x00 is ignored). Frames with CAN_DL <= 8 (SF) follow the CAN CC padding rules.
+- **Code:** protocolrx.c:isotp_rcv() N_PCI_XL_SF, chk_pad_fail() ll_dl
 
 ### XL-SDT6-001
 
@@ -989,7 +989,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** Expected: a CAN CC tunnel (SDT 6) socket only processes frames with CAN_DL <= 8. Observed behaviour is reported.
 - **Code:** protocolrx.c:isotp_rcv(), isotp_rcv_ff() (no SDT 6 specific length check)
-- **ISO 15765-2:** DEVIATION (if observed): SDT 6 sockets accept SF/FF/CF with CAN_DL > 8 (fixed by xl-isotp patch 35).
+- **ISO 15765-2:** DEVIATION (if observed): SDT 6 sockets accept SF/FF/CF with CAN_DL > 8 (fixed by xl-isotp split_v2 patch 31).
 
 ### XL-SDT7-001
 
@@ -1004,15 +1004,21 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** Expected: a CAN FD tunnel (SDT 7) socket only processes frames with a CAN FD data length (<= 8 or a DLC length up to 64). Observed behaviour for SF in the CAN XL SF format with CAN_DL 100 and 13 is reported; a valid CAN FD SF is received.
 - **Code:** protocolrx.c:isotp_check_frame_head() tunnel length check, isotp_rcv() N_PCI_XL_SF
-- **ISO 15765-2:** DEVIATION (if observed): SDT 7 sockets accept SF with CAN_DL > 64 or without CAN FD DLC length (fixed by xl-isotp patch 35).
+- **ISO 15765-2:** DEVIATION (if observed): SDT 7 sockets accept SF with CAN_DL > 64 or without CAN FD DLC length (fixed by xl-isotp split_v2 patch 31).
 
 ### XL-SDT7-003
 
 **SDT 7 SF with N_PCI 0x08**
 
-- **Behaviour:** Observation: a CAN FD tunnel (SDT 7) SF with CAN_DL 12 and N_PCI 0x08 0x0A is reported as accepted or ignored (CAN FD only defines N_PCI 0x00 for the SF_DL escape).
-- **Code:** protocolrx.c:isotp_rcv() forced N_PCI_XL_SF for CAN FD PDUs
-- **ISO 15765-2:** REVIEW: with CAN FD PDUs in CAN XL the low nibble bits 0..2 of the SF N_PCI are used as SF_DL bits 10..8, bit 3 is ignored.
+- **Behaviour:** A CAN FD tunnel (SDT 7) SF with CAN_DL 12 and N_PCI 0x08 0x0A is ignored, CAN FD only defines N_PCI 0x00 for the SF_DL escape.
+- **Code:** protocolrx.c:isotp_rcv() fd_pdu()
+
+### XL-SDT9-001
+
+**CAN FD N_PDUs in SDT 9**
+
+- **Behaviour:** A SDT 9 socket with LL mtu 72 handles CAN FD N_PDUs: SF with CAN_DL > 8 need the CAN FD escape (0x00) and a CAN FD length <= 64, FF with other lengths are ignored, PDUs with any CAN FD sender LL_DL are received.
+- **Code:** protocolrx.c:isotp_check_frame_head() fd_pdu(), isotp_rcv()
 
 ### XL-OPT-001
 
@@ -1069,11 +1075,11 @@ Parameterized test cases with the same behaviour are grouped.
 - **Behaviour:** Like the end-to-end test with BS 3 and STmin 0xF1 (100 us) in the FC frames of both sockets.
 - **Code:** protocoltx.c, protocolrx.c, hrtimer.c
 
-### E2E-FD64BRS-PLAIN .. E2E-XL9-2048-AE (9 variants)
+### E2E-FD64BRS-PLAIN .. E2E-XL9-2048-AE (11 variants)
 
 **end-to-end FD64BRS PLAIN**
 
-- **Variants:** `E2E-FD64BRS-PLAIN`, `E2E-XL9-8-PLAIN`, `E2E-XL9-12-PAD`, `E2E-XL9-64-PLAIN`, `E2E-XL9-64-AEPAD`, `E2E-XL9-65-AE`, `E2E-XL9-255-PLAIN`, `E2E-XL9-2048-PLAIN`, `E2E-XL9-2048-AE`
+- **Variants:** `E2E-FD64BRS-PLAIN`, `E2E-XL9-8-PLAIN`, `E2E-XL9-12-PLAIN`, `E2E-XL9-64-PLAIN`, `E2E-XL9-64-AE`, `E2E-XL9FD-12-PAD`, `E2E-XL9FD-64-AEPAD`, `E2E-XL9-65-AE`, `E2E-XL9-255-PLAIN`, `E2E-XL9-2048-PLAIN`, `E2E-XL9-2048-AE`
 - **Behaviour:** Two CAN_ISOTP sockets with swapped CAN IDs (and swapped address extensions/padding content) exchange PDUs of all relevant lengths in both directions and in full duplex (simultaneous transfers) without errors.
 - **Code:** protocoltx.c, protocolrx.c, hrtimer.c
 
