@@ -933,9 +933,8 @@ Parameterized test cases with the same behaviour are grouped.
 
 **AF bits 30/31 ignored (SDT 9)**
 
-- **Behaviour:** In SDT 9 mode the AF bits 30 and 31 are ignored at reception time.
+- **Behaviour:** In SDT 9 mode the AF bits 31/30 are reserved: they are sent as 0 (see XL-HDR-001) and ignored at reception time (forward compatibility).
 - **Code:** protocolrx.c:isotp_check_frame_head() CAN_CIA_ADDR_MASK
-- **ISO 15765-2:** REVIEW: AF bits 30/31 are not checked for native ISO 15765-2 N_PDUs (SDT 9).
 
 ### XL-HDR-004
 
