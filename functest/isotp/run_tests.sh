@@ -63,6 +63,26 @@ fi
 	echo "can-tests:     $(git describe --always --dirty 2>/dev/null)"
 	echo "options:       $OPTS"
 	echo "max_pdu_size:  $(cat /sys/module/can_isotp/parameters/max_pdu_size 2>/dev/null || echo n/a)"
+	# loaded can-isotp module (may differ from the installed module file)
+	M=/sys/module/can_isotp
+	MODINFO=$(command -v modinfo || echo /sbin/modinfo)
+	if [ -e $M/srcversion ]; then
+		LSRC=$(cat $M/srcversion)
+		echo "can-isotp:     loaded srcversion $LSRC taint '$(cat $M/taint 2>/dev/null)'"
+	elif [ -d $M ]; then
+		LSRC=""
+		echo "can-isotp:     built-in"
+	else
+		LSRC=""
+		echo "can-isotp:     not loaded"
+	fi
+	FSRC=$($MODINFO -F srcversion can-isotp 2>/dev/null)
+	echo "module file:   $($MODINFO -F filename can-isotp 2>/dev/null || echo n/a)"
+	echo "file srcvers.: ${FSRC:-n/a}"
+	echo "vermagic:      $($MODINFO -F vermagic can-isotp 2>/dev/null || echo n/a)"
+	if [ -n "$LSRC" ] && [ "$LSRC" != "$FSRC" ]; then
+		echo "NOTE:          loaded can-isotp module differs from the module file"
+	fi
 	echo "rmem_max:      $(cat /proc/sys/net/core/rmem_max)"
 	echo "cpus:          $(nproc)"
 	echo "vcan echo:     $(cat /sys/module/vcan/parameters/echo 2>/dev/null || echo n/a)"
