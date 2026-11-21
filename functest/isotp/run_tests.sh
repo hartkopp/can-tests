@@ -70,8 +70,6 @@ fi
 	for i in vcaniso6 vcaniso7 vcaniso8 vcaniso9; do
 		[ -e /sys/class/net/$i ] && echo "$i: $($TC qdisc show dev $i 2>/dev/null | head -n 1)"
 	done
-	echo "FT_IF_HW:      ${FT_IF_HW:-not set}"
-	[ -n "$FT_IF_HW" ] && ip -details -statistics link show "$FT_IF_HW"
 	echo
 	for i in vcaniso0 vcaniso1 vcaniso2 vcaniso3 vcaniso4 vcaniso5; do
 		echo "$i mtu $(cat /sys/class/net/$i/mtu) $(cat /sys/class/net/$i/operstate)"

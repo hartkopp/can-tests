@@ -99,7 +99,6 @@ enum ft_if {
 	FT_IF_EDELAY,	/* vcaniso7 vcan echo=1 + netem delay 3000ms */
 	FT_IF_ESLOW,	/* vcaniso8 vcan echo=1 + netem delay 100ms */
 	FT_IF_ERATE,	/* vcaniso9 vcan echo=1 + tbf rate 2kbit */
-	FT_IF_HW,	/* optional real CAN interface without bus partner */
 	FT_IF_MAX
 };
 
@@ -165,10 +164,6 @@ const char *ft_ifname(enum ft_if i);
 int ft_ifindex(enum ft_if i);
 /* skip the test case if the interface is not available */
 bool ft_need_if(struct ft_ctx *ctx, enum ft_if i);
-/* skip the test case if no suitable real CAN interface (FT_IF_HW) is given:
- * interface up and with IFF_ECHO (local echo after successful transmission)
- */
-bool ft_need_hw(struct ft_ctx *ctx);
 /* skip the test case if the interface is not up or has no IFF_ECHO */
 bool ft_need_echo_if(struct ft_ctx *ctx, enum ft_if i);
 
