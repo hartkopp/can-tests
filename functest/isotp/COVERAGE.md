@@ -111,7 +111,7 @@ paths that are not reachable with virtual CAN interfaces.
 | | no can_skb_ext | *n/c* (WARN) |
 | | echo of a FF (no cfecho) | all segmented TX tests |
 | | late echo of a timed out transfer (uid mismatch) | TIM-ECHO-005 |
-| | echo delay paces the CFs (txfrtimer starts at the echo) | TIM-ECHO-008..010 (tbf), TIM-ECHO-006/007 (netem, FINDING: CF echo not recognized) |
+| | echo delay paces the CFs (txfrtimer starts at the echo) | TIM-ECHO-008..010 (tbf), TIM-ECHO-006/007 (netem, FINDING: CF echo not recognized, cause net/core skb_orphan_partial()) |
 | | not in SENDING state | *n/c* (race) |
 | | transfer complete | TX-SEG-*, TX-WTD-* |
 | | block size reached => wait for FC | TX-FC-001-*, TX-FC-017, TIM-NBS-003 |

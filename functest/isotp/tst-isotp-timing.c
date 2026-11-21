@@ -497,7 +497,7 @@ static void tim_echo_slow(struct ft_ctx *ctx, const void *param)
 		if (!ft_peer_next(ctx, &p, &f, 1000)) {
 			ft_async_join(ctx, &a, 3000);
 			if (sp->iface == FT_IF_ESLOW && i > 1 && a.ret == -ECOMM) {
-				ft_note_finding(ctx, "CF %d not sent, transfer aborted with ECOMM: the echo of CF %d was not recognized. netem (delay) orphans skbs without sock_wfree destructor (skb_orphan_partial()); the CF skbs are created with alloc_skb() + can_skb_set_owner() (sock_efree) and lose skb->sk, so isotp_rcv_echo() drops the echo (skb->sk != sk). SF/FF skbs from sock_alloc_send_skb() keep skb->sk.",
+				ft_note_finding(ctx, "CF %d not sent, transfer aborted with ECOMM: the echo of CF %d was not recognized. netem (delay) calls skb_orphan_partial() (net/core/sock.c) which keeps skb->sk only for skbs with sock_wfree destructor; the CF skbs from alloc_skb() + can_skb_set_owner() are already partially orphaned (sock_efree + sk reference) but lose skb->sk, so isotp_rcv_echo() drops the echo (skb->sk != sk). SF/FF skbs from sock_alloc_send_skb() keep skb->sk. Cause in net/core: skb_orphan_partial() should keep sock_efree skbs.",
 						i, i - 1);
 			} else {
 				ft_fail(ctx, "CF %d missing (send() %zd %s)", i,
@@ -676,14 +676,14 @@ static const struct ft_test tests[] = {
 	  tim_echo_slow,
 	  &((const struct slow_param){ FT_IF_ESLOW, 0x0A, 0, 100 * MS + 10 * MS + TXT_DEF }),
 	  "vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): a SF send() with WAIT_TX_DONE returns after the delayed echo. Expected: the separation time between CFs (STmin + frame_txtime) starts at the echo of the previous CF (gap = echo delay + STmin + frame_txtime). Observed behaviour is reported.",
-	  "protocoltx.c:isotp_send_cframe() alloc_skb()/can_skb_set_owner(), isotp_rcv_echo() skb->sk check, sch_netem.c:netem_enqueue() skb_orphan_partial()",
-	  "FINDING (if observed): netem with delay orphans the CF skbs (sock_efree destructor), the CF echo is not recognized and the transfer is aborted with ECOMM."),
+	  "protocoltx.c:isotp_send_cframe() alloc_skb()/can_skb_set_owner(), isotp_rcv_echo() skb->sk check, sch_netem.c:netem_enqueue(), sock.c:skb_orphan_partial()",
+	  "FINDING (if observed): netem with delay orphans the CF skbs (sock_efree destructor), the CF echo is not recognized and the transfer is aborted with ECOMM. Cause in net/core: skb_orphan_partial() does not keep already partially orphaned (sock_efree) skbs."),
 	T("TIM-ECHO-007", "netem delayed echo (CF broadcast)", FT_TIMING,
 	  tim_echo_slow,
 	  &((const struct slow_param){ FT_IF_ESLOW, 0, CAN_ISOTP_CF_BROADCAST, 100 * MS + TXT_DEF }),
 	  "vcan with echo=1 and netem delay 100ms (setup_vcan.sh -e): expected: in CF broadcast mode each frame (incl. the FF) is sent after the echo of the previous frame + frame_txtime. Observed behaviour is reported.",
-	  "protocoltx.c:isotp_send_cframe() alloc_skb()/can_skb_set_owner(), isotp_rcv_echo() skb->sk check, sch_netem.c:netem_enqueue() skb_orphan_partial()",
-	  "FINDING (if observed): netem with delay orphans the CF skbs (sock_efree destructor), the CF echo is not recognized and the transfer is aborted with ECOMM."),
+	  "protocoltx.c:isotp_send_cframe() alloc_skb()/can_skb_set_owner(), isotp_rcv_echo() skb->sk check, sch_netem.c:netem_enqueue(), sock.c:skb_orphan_partial()",
+	  "FINDING (if observed): netem with delay orphans the CF skbs (sock_efree destructor), the CF echo is not recognized and the transfer is aborted with ECOMM. Cause in net/core: skb_orphan_partial() does not keep already partially orphaned (sock_efree) skbs."),
 	T("TIM-ECHO-008", "slow bus paces CFs (tbf, STmin 0)", FT_TIMING,
 	  tim_echo_slow,
 	  &((const struct slow_param){ FT_IF_ERATE, 0x00, 0, 64 * MS }),
