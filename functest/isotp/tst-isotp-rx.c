@@ -911,11 +911,21 @@ out:
 static void rx_ff_fc_content(struct ft_ctx *ctx, const void *param)
 {
 	static const struct can_isotp_fc_options fcs[] = {
-		{ 0, 0, 0 }, { 5, 0x80, 3 }, { 0xFF, 0xFF, 0xFF },
-		{ 1, 0xF1, 0 }, { 0, 0x7F, 0 },
+		{ 0, 0, 0 }, { 5, 0x7F, 3 }, { 0xFF, 0xF9, 0xFF },
+		{ 1, 0xF1, 0 }, { 0, 0x01, 0 },
 	};
 	struct ft_isotp_cfg c;
 	unsigned int i;
+	int s;
+
+	/* reserved STmin values are rejected by CAN_ISOTP_RECV_FC */
+	ft_cfg_init(&c);
+	c.fc.stmin = 0x80;
+	s = ft_isotp_open_err(&c);
+	FT_CHECK(ctx, s == -EINVAL, "RECV_FC stmin 80: %s",
+		 ft_errname(s >= 0 ? 0 : s));
+	if (s >= 0)
+		close(s);
 
 	for (i = 0; i < sizeof(fcs) / sizeof(fcs[0]); i++) {
 		ft_cfg_init(&c);
@@ -923,7 +933,7 @@ static void rx_ff_fc_content(struct ft_ctx *ctx, const void *param)
 		if (!rxenv_open(ctx, &c))
 			return;
 
-		/* the FC frame contains BS and STmin unchecked */
+		/* the FC frame contains BS and STmin from CAN_ISOTP_RECV_FC */
 		rx_tx(ctx, 8, 8, 0x10, 0x40, 1, 2, 3, 4, 5, 6);
 		rx_expect_fc(ctx, FT_FS_CTS);
 		ft_peer_expect_none(ctx, &env.p, 20);
@@ -1658,12 +1668,12 @@ static const struct ft_test tests[] = {
 	  &((const struct ffmin_param){ "CC8", FT_V_PLAIN, 8 }),
 	  "A FF with FF_DL < FF_DLmin (the PDU fits into a SF of the sender LL_DL: 7-ae for LL_DL 8, LL_DL-2-ae else) is ignored, FF_DL >= FF_DLmin is answered with a FC.",
 	  "protocolrx.c:isotp_rcv_ff() FF_DLmin check",
-	  "DEVIATION (if observed): CAN CC FF_DL 7 (normal) / 6 (extended addressing) is accepted although it fits into a SF (ISO 15765-2 FF_DLmin 8 / 7), fixed by xl-isotp split_v2 patch 17."),
+	  "DEVIATION (if observed): CAN CC FF_DL 7 (normal) / 6 (extended addressing) is accepted although it fits into a SF (ISO 15765-2 FF_DLmin 8 / 7), fixed by xl-isotp split_v2 patch 18."),
 	T("RX-FF-004-CC8-ae", "FF_DL minimum CC8 ext. addr.", 0, rx_ff_min,
 	  &((const struct ffmin_param){ "CC8", FT_V_AE, 7 }),
 	  "A FF with FF_DL < FF_DLmin (the PDU fits into a SF of the sender LL_DL: 7-ae for LL_DL 8, LL_DL-2-ae else) is ignored, FF_DL >= FF_DLmin is answered with a FC.",
 	  "protocolrx.c:isotp_rcv_ff() FF_DLmin check",
-	  "DEVIATION (if observed): CAN CC FF_DL 7 (normal) / 6 (extended addressing) is accepted although it fits into a SF (ISO 15765-2 FF_DLmin 8 / 7), fixed by xl-isotp split_v2 patch 17."),
+	  "DEVIATION (if observed): CAN CC FF_DL 7 (normal) / 6 (extended addressing) is accepted although it fits into a SF (ISO 15765-2 FF_DLmin 8 / 7), fixed by xl-isotp split_v2 patch 18."),
 	T("RX-FF-004-FD64", "FF_DL minimum FD64", 0, rx_ff_min,
 	  &((const struct ffmin_param){ "FD64", FT_V_PLAIN, 63 }),
 	  "A FF with FF_DL < FF_DLmin (the PDU fits into a SF of the sender LL_DL: 7-ae for LL_DL 8, LL_DL-2-ae else) is ignored, FF_DL >= FF_DLmin is answered with a FC.",
@@ -1679,7 +1689,7 @@ static const struct ft_test tests[] = {
 	  "listen",
 	  "Expected: in CAN_ISOTP_LISTEN_MODE no frames are sent. Observed behaviour for a FF with FF_DL > max_pdu_size is reported.",
 	  "protocolrx.c:isotp_rcv_ff() isotp_send_fc(OVFLW) before the LISTEN_MODE check",
-	  "DEVIATION (if observed): a FC.OVFLW is sent in listen mode, which can abort transfers between other nodes (fixed by xl-isotp split_v2 patch 19)."),
+	  "DEVIATION (if observed): a FC.OVFLW is sent in listen mode, which can abort transfers between other nodes (fixed by xl-isotp split_v2 patch 20)."),
 	T("RX-FF-011", "FF_DL close to 2^32", 0, rx_ff_maxdl, NULL,
 	  "Expected: all FF_DL values > max_pdu_size (up to 0xFFFFFFFF) are answered with FC.OVFLW. Observed behaviour is reported.",
 	  "protocolrx.c:isotp_rcv_ff() 'so->rx.len + ae + ff_pci_sz <= so->rx.ll_dl' (u32 arithmetic)",
@@ -1699,9 +1709,9 @@ static const struct ft_test tests[] = {
 	  "protocolrx.c:isotp_rcv_ff() sets ISOTP_IDLE before the checks",
 	  "REVIEW: an invalid (to be ignored) FF terminates an ongoing reception."),
 	T("RX-FF-009", "FC content from RECV_FC", 0, rx_ff_fc_content, NULL,
-	  "The FC.CTS contains BS and STmin from CAN_ISOTP_RECV_FC without checks (also reserved STmin values). wftmax has no effect, FC.WT is never sent.",
-	  "protocoltx.c:isotp_send_fc()",
-	  "REVIEW: reserved STmin values are sent; N_WFTmax / FC.WT are not implemented (no flow control wait on the receiver side)."),
+	  "The FC.CTS contains BS and STmin from CAN_ISOTP_RECV_FC (reserved STmin values are rejected by the socket option). wftmax has no effect, FC.WT is never sent.",
+	  "protocoltx.c:isotp_send_fc(), isotp.c:isotp_setsockopt_locked()",
+	  "REVIEW: N_WFTmax / FC.WT are not implemented (no flow control wait on the receiver side)."),
 	T("RX-FF-010-CC8", "listen mode reception CC8", 0, rx_ff_listen,
 	  "CC8",
 	  "In CAN_ISOTP_LISTEN_MODE PDUs are received without sending FC frames (BS is ignored).",
@@ -1739,11 +1749,11 @@ static const struct ft_test tests[] = {
 	  &dl0_4,
 	  "Only the last CF may be shorter than LL_DL and it has to contain all remaining bytes of the PDU. A short CF lacking bytes (here 3 of 7) is ignored and the reception continues with the correct CF.",
 	  "protocolrx.c:isotp_rcv_cf() last CF length check",
-	  "DEVIATION (if observed): the short CF is accepted, consumes a SN and the reception waits for further CFs (fixed by xl-isotp split_v2 patch 18)."),
+	  "DEVIATION (if observed): the short CF is accepted, consumes a SN and the reception waits for further CFs (fixed by xl-isotp split_v2 patch 19)."),
 	T("RX-CF-015", "CF with N_PCI only", 0, rx_cf_short_last, &dl0_1,
 	  "A CF with only the N_PCI (no data) is a short CF lacking bytes and is ignored; the reception continues with the correct CF.",
 	  "protocolrx.c:isotp_rcv_cf() last CF length check",
-	  "DEVIATION (if observed): the empty CF is accepted and consumes a SN (fixed by xl-isotp split_v2 patch 18)."),
+	  "DEVIATION (if observed): the empty CF is accepted and consumes a SN (fixed by xl-isotp split_v2 patch 19)."),
 	T("RX-CF-007-CC8", "block size handling CC8", 0, rx_cf_bs, NULL,
 	  "The receiver sends a FC after every BS CFs (BS 1..255).",
 	  "protocolrx.c:isotp_rcv_cf() so->rxfc.bs", NULL),

@@ -565,30 +565,41 @@ static void api_opt_undef_flags(struct ft_ctx *ctx, const void *param)
 
 static void api_opt_recvfc(struct ft_ctx *ctx, const void *param)
 {
-	static const struct can_isotp_fc_options tc[] = {
-		{ 0, 0, 0 }, { 1, 0x7F, 1 }, { 0xFF, 0x80, 0xFF },
-		{ 0x10, 0xF0, 0 }, { 2, 0xF1, 0 }, { 3, 0xF9, 0 },
-		{ 4, 0xFA, 0 }, { 5, 0xFF, 0 },
-	};
-	struct can_isotp_fc_options get;
+	struct can_isotp_fc_options fc, get, last = { 0, 0, 0 };
 	socklen_t len;
-	unsigned int i;
-	int s;
+	unsigned int v;
+	int s, r, exp, nerr = 0;
 
 	(void)param;
 
 	s = isotp_socket(ctx);
 	FT_BAIL(ctx);
 
-	for (i = 0; i < sizeof(tc) / sizeof(tc[0]); i++) {
-		CHECK_RET(ctx, set_opt(s, CAN_ISOTP_RECV_FC, &tc[i],
-				       sizeof(tc[i])), 0);
+	/* bs and wftmax are not checked, STmin 0x80 - 0xF0, 0xFA - 0xFF
+	 * are reserved and rejected (the stored values stay unchanged)
+	 */
+	for (v = 0; v < 256; v++) {
+		fc.bs = 255 - v;
+		fc.stmin = v;
+		fc.wftmax = v;
+		r = set_opt(s, CAN_ISOTP_RECV_FC, &fc, sizeof(fc));
+		exp = (v > 0x7F && (v < 0xF1 || v > 0xF9)) ? -EINVAL : 0;
+		if (r != exp) {
+			ft_fail(ctx, "RECV_FC stmin %02X: %s (expected %s)", v,
+				ft_errname(r), ft_errname(exp));
+			if (++nerr > 5)
+				break;
+		}
+		if (!r)
+			last = fc;
 		len = sizeof(get);
 		CHECK_RET(ctx, get_opt(s, CAN_ISOTP_RECV_FC, &get, &len), 0);
-		FT_CHECK(ctx, !memcmp(&get, &tc[i], sizeof(get)),
-			 "RECV_FC bs %u stmin %02X wftmax %u stored as %u %02X %u",
-			 tc[i].bs, tc[i].stmin, tc[i].wftmax, get.bs,
-			 get.stmin, get.wftmax);
+		if (memcmp(&get, &last, sizeof(get))) {
+			ft_fail(ctx, "RECV_FC stmin %02X: stored %u %02X %u", v,
+				get.bs, get.stmin, get.wftmax);
+			if (++nerr > 5)
+				break;
+		}
 	}
 
 	close(s);
@@ -2005,9 +2016,8 @@ static const struct ft_test tests[] = {
 	  "isotp.c:isotp_setsockopt_locked()",
 	  "REVIEW: no validation of reserved option flags (forward compatibility vs. strictness)."),
 	T("API-OPT-008", "CAN_ISOTP_RECV_FC values", 0, api_opt_recvfc,
-	  "CAN_ISOTP_RECV_FC (bs, stmin, wftmax) is stored without any value check, including reserved STmin values (0x80..0xF0, 0xFA..0xFF).",
-	  "isotp.c:isotp_setsockopt_locked(), uapi isotp.h remark on CAN_ISOTP_DEFAULT_RECV_*",
-	  "REVIEW: reserved STmin values can be sent in FC frames (ISO 15765-2 reserves them)."),
+	  "CAN_ISOTP_RECV_FC stores bs and wftmax without checks. The reserved STmin values (0x80..0xF0, 0xFA..0xFF) are rejected with EINVAL and leave the stored values unchanged.",
+	  "isotp.c:isotp_setsockopt_locked() CAN_ISOTP_RECV_FC", NULL),
 	T("API-OPT-009", "CAN_ISOTP_TX_STMIN / RX_STMIN values", 0,
 	  api_opt_stmin,
 	  "CAN_ISOTP_TX_STMIN and CAN_ISOTP_RX_STMIN accept any u32 nanosecond value.",
