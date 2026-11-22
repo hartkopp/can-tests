@@ -649,9 +649,8 @@ Parameterized test cases with the same behaviour are grouped.
 
 **invalid SF during reception**
 
-- **Behaviour:** An invalid SF (SF_DL 0) received during a segmented reception terminates the reception silently.
-- **Code:** protocolrx.c:isotp_rcv_sf() sets ISOTP_IDLE before the SF_DL check
-- **ISO 15765-2:** REVIEW: an invalid (to be ignored) SF terminates an ongoing reception.
+- **Behaviour:** An invalid SF (SF_DL 0 or SF_DL > CAN_DL - 1) received during a segmented reception is ignored: the reception continues and the PDU is completed by the remaining CFs.
+- **Code:** protocolrx.c:isotp_rcv_sf() SF_DL check before terminating the reception
 
 ### RX-SF-014
 
@@ -727,9 +726,8 @@ Parameterized test cases with the same behaviour are grouped.
 
 **invalid FF during reception**
 
-- **Behaviour:** An invalid FF (CAN_DL < 8) during a reception terminates the reception silently.
-- **Code:** protocolrx.c:isotp_rcv_ff() sets ISOTP_IDLE before the checks
-- **ISO 15765-2:** REVIEW: an invalid (to be ignored) FF terminates an ongoing reception.
+- **Behaviour:** An invalid FF (CAN_DL < 8, FF_DL < FF_DLmin, unneeded 32 bit FF_DL escape) received during a reception is ignored: LL_DL and FF_DL of the ongoing reception are kept and the PDU is completed by the remaining CFs.
+- **Code:** protocolrx.c:isotp_rcv_ff() checks before terminating the reception
 
 ### RX-FF-009
 
@@ -939,7 +937,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** In SDT 7 (CAN FD tunnel) mode the AF bit 30 (BRS) is ignored at reception time, frames with AF bit 31 (CiA 611-1 ZDLC, zero data length) are dropped.
 - **Code:** protocolrx.c:isotp_check_frame_head() CAN_CIA_SDT_ZDLC
-- **ISO 15765-2:** DEVIATION (if observed): tunneled ZDLC frames are processed (fixed by xl-isotp split_v2 patch 33).
+- **ISO 15765-2:** DEVIATION (if observed): tunneled ZDLC frames are processed (fixed by xl-isotp split_v2 patch 34).
 
 ### XL-HDR-005
 
@@ -961,7 +959,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** In SDT 6 (CAN CC tunnel) mode frames with AF bit 30 (CiA 611-1 RTR) or bit 31 (ZDLC, zero data length) are dropped.
 - **Code:** protocolrx.c:isotp_check_frame_head() CAN_CIA_SDT6_RTR, CAN_CIA_SDT_ZDLC
-- **ISO 15765-2:** DEVIATION (if observed): tunneled RTR/ZDLC frames are processed (fixed by xl-isotp split_v2 patch 33).
+- **ISO 15765-2:** DEVIATION (if observed): tunneled RTR/ZDLC frames are processed (fixed by xl-isotp split_v2 patch 34).
 
 ### XL-SF-001
 
@@ -990,7 +988,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** Expected: a CAN CC tunnel (SDT 6) socket only processes frames with CAN_DL <= 8. Observed behaviour is reported.
 - **Code:** protocolrx.c:isotp_rcv(), isotp_rcv_ff() (no SDT 6 specific length check)
-- **ISO 15765-2:** DEVIATION (if observed): SDT 6 sockets accept SF/FF/CF with CAN_DL > 8 (fixed by xl-isotp split_v2 patch 33).
+- **ISO 15765-2:** DEVIATION (if observed): SDT 6 sockets accept SF/FF/CF with CAN_DL > 8 (fixed by xl-isotp split_v2 patch 34).
 
 ### XL-SDT7-001
 
@@ -1005,7 +1003,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** Expected: a CAN FD tunnel (SDT 7) socket only processes frames with a CAN FD data length (<= 8 or a DLC length up to 64). Observed behaviour for SF in the CAN XL SF format with CAN_DL 100 and 13 is reported; a valid CAN FD SF is received.
 - **Code:** protocolrx.c:isotp_check_frame_head() tunnel length check, isotp_rcv() N_PCI_XL_SF
-- **ISO 15765-2:** DEVIATION (if observed): SDT 7 sockets accept SF with CAN_DL > 64 or without CAN FD DLC length (fixed by xl-isotp split_v2 patch 33).
+- **ISO 15765-2:** DEVIATION (if observed): SDT 7 sockets accept SF with CAN_DL > 64 or without CAN FD DLC length (fixed by xl-isotp split_v2 patch 34).
 
 ### XL-SDT7-003
 
