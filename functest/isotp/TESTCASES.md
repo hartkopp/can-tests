@@ -388,7 +388,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **FC padding checks**
 
-- **Behaviour:** With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING\|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING\|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING rejects every FC. In XL mode (CAN XL N_PDUs, no padding) a FC with CAN_DL > 8 is invalid. Failing FCs abort the transfer with EBADMSG.
+- **Behaviour:** With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING\|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING\|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING rejects every FC. In XL mode (CAN XL N_PDUs, no padding) a FC with CAN_DL > 8 is not checked for padding. Failing FCs abort the transfer with EBADMSG.
 - **Code:** protocolrx.c:isotp_rcv_fc(), chk_pad_fail(), chk_optimized_fail()
 - **ISO 15765-2:** REVIEW: CAN_ISOTP_CHK_PAD_DATA without CAN_ISOTP_RX_PADDING makes every frame fail the check (configuration not rejected).
 
@@ -970,22 +970,22 @@ Parameterized test cases with the same behaviour are grouped.
 
 **CAN XL SF format**
 
-- **Behaviour:** CAN XL N_PDUs (SDT 9, no CAN FD LL) use the 4 bit SF_DL for CAN_DL <= 8. For CAN_DL > 8 the N_PCI is 0x08 \| SF_DL bits 10..8 followed by SF_DL bits 7..0 and CAN XL N_PDUs are not padded: CAN_DL = 2 (+ae) + SF_DL. Other CAN_DL values, the CAN FD escape (0x00) and 4 bit SF_DL are ignored for CAN_DL > 8.
-- **Code:** protocolrx.c:isotp_rcv() N_PCI_XL_SF, isotp_rcv_sf() xl_npdu()
+- **Behaviour:** CAN XL N_PDUs (SDT 9, no CAN FD LL) use the 4 bit SF_DL for CAN_DL <= 8. For CAN_DL > 8 the N_PCI is 0x08 \| SF_DL bits 10..8 followed by SF_DL bits 7..0 (SF_DL 1..CAN_DL-2). Like for CAN CC/FD only the presence of the SF data is checked, not the exact CAN_DL. The CAN FD escape (0x00) and 4 bit SF_DL are ignored for CAN_DL > 8.
+- **Code:** protocolrx.c:isotp_rcv() N_PCI_XL_SF, isotp_rcv_sf()
 
 ### XL-SF-002
 
 **CAN XL N_PDUs with padding checks**
 
-- **Behaviour:** CAN XL N_PDUs (LL mtu 16, CAN_DL resp. RX_DL > 8) are not padded: with RX_PADDING/CHK_PAD_* flags SF with CAN_DL > 8 (exact length) and segmented PDUs with unpadded last CFs (also CAN_DL <= 8) are received without padding checks; a SF with bytes behind the SF data is ignored. A SF with CAN_DL > 8 always needs the XL SF PCI flag (the CAN FD escape 0x00 is ignored). Frames with CAN_DL <= 8 (SF) follow the CAN CC padding rules.
+- **Behaviour:** CAN XL N_PDUs (LL mtu 16, CAN_DL resp. RX_DL > 8) are not padded: with RX_PADDING/CHK_PAD_* flags SF with any CAN_DL > 8 (also with bytes behind the SF data) and segmented PDUs with unpadded last CFs (also CAN_DL <= 8) are received without padding checks. A SF with CAN_DL > 8 always needs the XL SF PCI flag (the CAN FD escape 0x00 is ignored). Frames with CAN_DL <= 8 (SF) follow the CAN CC padding rules.
 - **Code:** protocolrx.c:isotp_rcv() N_PCI_XL_SF, chk_pad_fail() ll_dl
 
 ### XL-CF-001
 
 **CAN XL last CF length**
 
-- **Behaviour:** CAN XL N_PDUs (RX_DL > 8) are not padded: a last CF with more bytes than the missing PDU data is ignored (also with CAN_DL <= 8), the reception continues and the exact last CF completes the PDU.
-- **Code:** protocolrx.c:isotp_rcv_cf() xl_npdu()
+- **Behaviour:** Like for CAN CC/FD only the presence of the PDU data is checked: a last CF of a CAN XL N_PDU (RX_DL > 8) with more bytes than the missing PDU data (also with CAN_DL <= 8) completes the PDU.
+- **Code:** protocolrx.c:isotp_rcv_cf()
 
 ### XL-SDT6-001
 

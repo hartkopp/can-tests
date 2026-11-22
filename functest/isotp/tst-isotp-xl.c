@@ -389,10 +389,10 @@ static void xl_sf_native(struct ft_ctx *ctx, const void *param)
 	xl_sf(ctx, 100, 0x08, 98, 2, 98, 1);
 	xl_sf(ctx, 300, 0x09, 298 - 256, 2, 298, 1);
 	xl_sf(ctx, 2048, 0x0F, 0xFE, 2, 2046, 1);
-	/* no padding: SF_DL smaller than the CAN_DL allows is ignored */
-	xl_sf(ctx, 100, 0x08, 1, 2, 1, 0);
-	xl_sf(ctx, 2048, 0x08, 3, 2, 3, 0);
-	xl_sf(ctx, 13, 0x08, 10, 2, 10, 0);
+	/* only the presence of the SF data is checked (no exact length) */
+	xl_sf(ctx, 100, 0x08, 1, 2, 1, 1);
+	xl_sf(ctx, 2048, 0x08, 3, 2, 3, 1);
+	xl_sf(ctx, 13, 0x08, 10, 2, 10, 1);
 
 	/* invalid */
 	xl_sf(ctx, 12, 0x00, 10, 2, 10, 0);	/* FD style escape */
@@ -424,7 +424,7 @@ static void xl_sf_pad(struct ft_ctx *ctx, const void *param)
 	xl_sf(ctx, 12, 0x08, 10, 2, 10, 1);	/* XL SF */
 	xl_sf(ctx, 11, 0x08, 9, 2, 9, 1);	/* no CAN FD DLC length */
 	xl_sf(ctx, 100, 0x08, 98, 2, 98, 1);	/* > 64 */
-	xl_sf(ctx, 64, 0x08, 7, 2, 7, 0);	/* 0xCC behind the SF data */
+	xl_sf(ctx, 64, 0x08, 7, 2, 7, 1);	/* 0xCC behind the SF data */
 	xl_sf(ctx, 12, 0x00, 10, 2, 10, 0);	/* FD style escape */
 	xl_sf(ctx, 11, 0x00, 9, 2, 9, 0);
 	xl_sf(ctx, 12, 0x05, 0, 1, 5, 0);	/* 4 bit SF_DL */
@@ -445,8 +445,8 @@ static void xl_sf_pad(struct ft_ctx *ctx, const void *param)
 	xlenv_close();
 }
 
-/* send a PDU with ll_dl where the last CF has the length lastlen first
- * (expected to be ignored) and then its exact length
+/* send a PDU with ll_dl where the last CF has the length lastlen (more bytes
+ * than the missing PDU data) - only the presence of the data is checked
  */
 static void xl_last_cf(struct ft_ctx *ctx, unsigned int len, unsigned int ll_dl,
 		       unsigned int lastlen)
@@ -462,7 +462,7 @@ static void xl_last_cf(struct ft_ctx *ctx, unsigned int len, unsigned int ll_dl,
 	e.ll_dl = ll_dl;
 	n = ft_enc_pdu(&e, &env.hrx, pdu, len, &fr);
 
-	ft_log(ctx, "PDU len %u LL_DL %u: last CF %u => ignored, then %u",
+	ft_log(ctx, "PDU len %u LL_DL %u: last CF %u (exact %u) => PDU",
 	       len, ll_dl, lastlen, fr[n - 1].len);
 	ft_peer_tx(ctx, &env.p, &fr[0]);
 	if (!FT_CHECK(ctx, ft_peer_next(ctx, &env.p, &f, 100), "no FC"))
@@ -475,10 +475,6 @@ static void xl_last_cf(struct ft_ctx *ctx, unsigned int len, unsigned int ll_dl,
 	memcpy(buf, fr[n - 1].data, fr[n - 1].len);
 	ft_frame_set(&f, &env.hrx, buf, lastlen);
 	ft_peer_tx(ctx, &env.p, &f);
-	ft_dut_expect_nopdu(ctx, env.s, 50);
-
-	/* the exact last CF completes the PDU */
-	ft_peer_tx(ctx, &env.p, &fr[n - 1]);
 	ft_dut_expect_pdu(ctx, env.s, pdu, len, 200);
 out:
 	free(fr);
@@ -900,15 +896,15 @@ static const struct ft_test tests[] = {
 	  "protocolrx.c:isotp_check_frame_head() CAN_CIA_SDT6_RTR, CAN_CIA_SDT_ZDLC",
 	  "DEVIATION (if observed): tunneled RTR/ZDLC frames are processed (fixed by xl-isotp split_v2 patch 31)."),
 	T("XL-SF-001", "CAN XL SF format", 0, xl_sf_native, NULL,
-	  "CAN XL N_PDUs (SDT 9, no CAN FD LL) use the 4 bit SF_DL for CAN_DL <= 8. For CAN_DL > 8 the N_PCI is 0x08 | SF_DL bits 10..8 followed by SF_DL bits 7..0 and CAN XL N_PDUs are not padded: CAN_DL = 2 (+ae) + SF_DL. Other CAN_DL values, the CAN FD escape (0x00) and 4 bit SF_DL are ignored for CAN_DL > 8.",
-	  "protocolrx.c:isotp_rcv() N_PCI_XL_SF, isotp_rcv_sf() xl_npdu()", NULL),
+	  "CAN XL N_PDUs (SDT 9, no CAN FD LL) use the 4 bit SF_DL for CAN_DL <= 8. For CAN_DL > 8 the N_PCI is 0x08 | SF_DL bits 10..8 followed by SF_DL bits 7..0 (SF_DL 1..CAN_DL-2). Like for CAN CC/FD only the presence of the SF data is checked, not the exact CAN_DL. The CAN FD escape (0x00) and 4 bit SF_DL are ignored for CAN_DL > 8.",
+	  "protocolrx.c:isotp_rcv() N_PCI_XL_SF, isotp_rcv_sf()", NULL),
 	T("XL-SF-002", "CAN XL N_PDUs with padding checks", 0, xl_sf_pad,
 	  NULL,
-	  "CAN XL N_PDUs (LL mtu 16, CAN_DL resp. RX_DL > 8) are not padded: with RX_PADDING/CHK_PAD_* flags SF with CAN_DL > 8 (exact length) and segmented PDUs with unpadded last CFs (also CAN_DL <= 8) are received without padding checks; a SF with bytes behind the SF data is ignored. A SF with CAN_DL > 8 always needs the XL SF PCI flag (the CAN FD escape 0x00 is ignored). Frames with CAN_DL <= 8 (SF) follow the CAN CC padding rules.",
+	  "CAN XL N_PDUs (LL mtu 16, CAN_DL resp. RX_DL > 8) are not padded: with RX_PADDING/CHK_PAD_* flags SF with any CAN_DL > 8 (also with bytes behind the SF data) and segmented PDUs with unpadded last CFs (also CAN_DL <= 8) are received without padding checks. A SF with CAN_DL > 8 always needs the XL SF PCI flag (the CAN FD escape 0x00 is ignored). Frames with CAN_DL <= 8 (SF) follow the CAN CC padding rules.",
 	  "protocolrx.c:isotp_rcv() N_PCI_XL_SF, chk_pad_fail() ll_dl", NULL),
 	T("XL-CF-001", "CAN XL last CF length", 0, xl_cf_len, NULL,
-	  "CAN XL N_PDUs (RX_DL > 8) are not padded: a last CF with more bytes than the missing PDU data is ignored (also with CAN_DL <= 8), the reception continues and the exact last CF completes the PDU.",
-	  "protocolrx.c:isotp_rcv_cf() xl_npdu()", NULL),
+	  "Like for CAN CC/FD only the presence of the PDU data is checked: a last CF of a CAN XL N_PDU (RX_DL > 8) with more bytes than the missing PDU data (also with CAN_DL <= 8) completes the PDU.",
+	  "protocolrx.c:isotp_rcv_cf()", NULL),
 	T("XL-SDT6-001", "SDT 6 reception of long frames", 0, xl_sdt6_rx, NULL,
 	  "Expected: a CAN CC tunnel (SDT 6) socket only processes frames with CAN_DL <= 8. Observed behaviour is reported.",
 	  "protocolrx.c:isotp_rcv(), isotp_rcv_ff() (no SDT 6 specific length check)",

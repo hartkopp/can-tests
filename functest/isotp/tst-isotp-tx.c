@@ -535,9 +535,9 @@ static const struct fc_pad_case fc_pad_cases[] = {
 	{ "XL9-2048", CAN_ISOTP_CHK_PAD_LEN, 0xCC, 4, 0xCC, -1, false },
 	{ "XL9-2048", CAN_ISOTP_RX_PADDING | CAN_ISOTP_CHK_PAD_LEN, 0xCC, 8, 0xCC, -1, true },
 	{ "XL9-2048", CAN_ISOTP_RX_PADDING | CAN_ISOTP_CHK_PAD_LEN, 0xCC, 3, 0xCC, -1, false },
-	/* FC with CAN_DL > 8: CAN XL N_PDUs are not padded => invalid */
-	{ "XL9-2048", CAN_ISOTP_RX_PADDING | CAN_ISOTP_CHK_PAD_LEN, 0xCC, 100, 0xCC, -1, false },
-	{ "XL9-2048", 0, 0xCC, 9, 0xCC, -1, false },
+	/* FC with CAN_DL > 8: CAN XL N_PDUs are not padded => no checks */
+	{ "XL9-2048", CAN_ISOTP_RX_PADDING | CAN_ISOTP_CHK_PAD_LEN, 0xCC, 100, 0xCC, -1, true },
+	{ "XL9-2048", 0, 0xCC, 9, 0xCC, -1, true },
 };
 
 static void tx_fc_pad(struct ft_ctx *ctx, const void *param)
@@ -1283,7 +1283,7 @@ static const struct ft_test tests[] = {
 	  "protocolrx.c:isotp_rcv() N_PCI length check, isotp_rcv_fc()",
 	  "DEVIATION (if observed): a FC without N_PCI is processed with data beyond CAN_DL (EBADMSG), fixed by xl-isotp split_v2 patch 14."),
 	T("TX-FC-011", "FC padding checks", 0, tx_fc_pad, NULL,
-	  "With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING rejects every FC. In XL mode (CAN XL N_PDUs, no padding) a FC with CAN_DL > 8 is invalid. Failing FCs abort the transfer with EBADMSG.",
+	  "With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING rejects every FC. In XL mode (CAN XL N_PDUs, no padding) a FC with CAN_DL > 8 is not checked for padding. Failing FCs abort the transfer with EBADMSG.",
 	  "protocolrx.c:isotp_rcv_fc(), chk_pad_fail(), chk_optimized_fail()",
 	  "REVIEW: CAN_ISOTP_CHK_PAD_DATA without CAN_ISOTP_RX_PADDING makes every frame fail the check (configuration not rejected)."),
 	T("TX-FC-012", "FC in idle state", 0, tx_fc_idle, NULL,
