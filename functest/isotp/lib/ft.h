@@ -81,7 +81,7 @@ struct ft_test {
 	const char *title;	/* short description */
 	const char *req;	/* checked behaviour (specification statement) */
 	const char *ref;	/* reference to the implementation */
-	const char *iso;	/* "DEVIATION: .." or "REVIEW: .." or NULL */
+	const char *iso;	/* "DEVIATION: ..", "NOTE: ..", "REVIEW: .." or NULL */
 	unsigned int flags;	/* FT_SLOW, FT_TIMING */
 	void (*fn)(struct ft_ctx *ctx, const void *param);
 	const void *param;	/* test case specific parameter */

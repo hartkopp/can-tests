@@ -162,7 +162,7 @@ received CAN frames, socket calls, the failing check with file:line).
 ```
 ok 12 - RX-SF-002 CAN CC SF invalid SF_DL
 ok 13 - RX-SF-003 CAN_DL 0 frame with stale N_PCI # DEVIATION
-ok 21 - RX-SF-012 valid SF during reception # REVIEW
+ok 21 - RX-SF-012 valid SF during reception
 not ok 22 - RX-SF-013 invalid SF during reception
 ```
 
@@ -172,8 +172,10 @@ not ok 22 - RX-SF-013 invalid SF during reception
 - `# DEVIATION`: the checked behaviour differs from ISO 15765-2. Some
   test cases check the ISO behaviour and report the observed deviation in
   the trace instead of failing.
-- `# REVIEW`: the behaviour is implementation specific or has to be
-  checked against the ISO 15765-2 text.
+- `# REVIEW`: the behaviour has to be checked against the ISO 15765-2
+  text (open point). Decided implementation specific behaviour is
+  documented as `NOTE` in the test case catalog (TESTCASES.md) without a
+  marker in the test output.
 - `# FINDING`: an implementation issue that is no ISO 15765-2 deviation
   (reported dynamically when observed).
 - `# SKIP`: interface missing or slow test case in quick mode.

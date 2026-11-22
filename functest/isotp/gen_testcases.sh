@@ -23,8 +23,9 @@ Each test case lists
 - **ISO 15765-2**: \`DEVIATION\` notes (behaviour differs from ISO 15765-2,
   shown as \`# DEVIATION\` in the test output), \`DEVIATION (if observed)\`
   notes (the test case checks the ISO behaviour and reports the deviation
-  only when it is observed) and \`REVIEW\` notes (needs a check against the
-  ISO 15765-2 text or is implementation specific),
+  only when it is observed), \`NOTE\` notes (documented implementation
+  specific behaviour) and \`REVIEW\` notes (needs a check against the
+  ISO 15765-2 text),
 - **Flags**: \`slow\` (runs into 1 s protocol timeouts, skipped with -q),
   \`timing\` (checks timing with a tolerance).
 

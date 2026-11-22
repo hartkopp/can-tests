@@ -11,8 +11,9 @@ Each test case lists
 - **ISO 15765-2**: `DEVIATION` notes (behaviour differs from ISO 15765-2,
   shown as `# DEVIATION` in the test output), `DEVIATION (if observed)`
   notes (the test case checks the ISO behaviour and reports the deviation
-  only when it is observed) and `REVIEW` notes (needs a check against the
-  ISO 15765-2 text or is implementation specific),
+  only when it is observed), `NOTE` notes (documented implementation
+  specific behaviour) and `REVIEW` notes (needs a check against the
+  ISO 15765-2 text),
 - **Flags**: `slow` (runs into 1 s protocol timeouts, skipped with -q),
   `timing` (checks timing with a tolerance).
 
@@ -96,7 +97,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** Undefined flag bits (>= 0x8000) are accepted and stored without error.
 - **Code:** isotp.c:isotp_setsockopt_locked()
-- **ISO 15765-2:** REVIEW: no validation of reserved option flags (forward compatibility vs. strictness).
+- **ISO 15765-2:** NOTE: intended for forward compatibility: undefined flag bits are ignored (no EINVAL).
 
 ### API-OPT-013
 
@@ -347,7 +348,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** The sender accepts any number of FC.WT frames (here 25 within 1.5 s > N_Bs) as long as each arrives within N_Bs.
 - **Code:** protocolrx.c:isotp_rcv_fc() ISOTP_FC_WT
-- **ISO 15765-2:** REVIEW: there is no N_WFTmax limit on the sender side (ISO 15765-2 defines N_WFTmax for the receiver only); CAN_ISOTP_RECV_FC.wftmax is stored but unused and the receiver never sends FC.WT.
+- **ISO 15765-2:** NOTE: ISO 15765-2 defines N_WFTmax for the receiver only, so there is no limit on the sender side. CAN_ISOTP_RECV_FC.wftmax is stored but unused and the receiver never sends FC.WT (RX-FF-009).
 - **Flags:** slow
 
 ### TX-FC-006
@@ -371,7 +372,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** FC.OVFLW after a block also aborts the transfer with EMSGSIZE.
 - **Code:** protocolrx.c:isotp_rcv_fc() ISOTP_FC_OVFLW
-- **ISO 15765-2:** REVIEW: ISO 15765-2 only allows FC.OVFLW as response to a FF.
+- **ISO 15765-2:** NOTE: fault tolerant: ISO 15765-2 only allows FC.OVFLW as response to a FF. A FC.OVFLW after a block aborts the transfer as well instead of being ignored.
 
 ### TX-FC-009
 
@@ -409,7 +410,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** FC frames received while the sender is not waiting for a FC (sending CFs) are ignored silently.
 - **Code:** protocolrx.c:isotp_rcv_fc()
-- **ISO 15765-2:** REVIEW: ISO 15765-2 handles an unexpected FC as N_UNEXP_PDU (ignored) - matches.
+- **ISO 15765-2:** NOTE: matches ISO 15765-2 (an unexpected FC is a N_UNEXP_PDU and is ignored).
 
 ### TX-FC-014-plain .. TX-FC-014-ae (2 variants)
 
@@ -620,7 +621,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** CAN FD SF with CAN_DL <= 8 use the 4 bit SF_DL; with CAN_DL > 8 the escape sequence (N_PCI 0x00 + SF_DL byte) with SF_DL 1..CAN_DL-2 is accepted.
 - **Code:** protocolrx.c:isotp_rcv() N_PCI_SF can_is_canfd_skb()
-- **ISO 15765-2:** REVIEW: SF_DL values which would fit into a shorter CAN FD frame (e.g. SF_DL 1 in CAN_DL 64) and SF_DL <= 7 with escape are accepted (ISO 15765-2 requires the optimal CAN_DL for SF_DL > 7 / uses the escape only for CAN_DL > 8).
+- **ISO 15765-2:** NOTE: fault tolerant reception: SF_DL values which would fit into a shorter CAN FD frame (e.g. SF_DL 1 in CAN_DL 64) and SF_DL <= 7 with escape are accepted (ISO 15765-2 requires the optimal CAN_DL for SF_DL > 7 and uses the escape only for CAN_DL > 8). An oversized CAN_DL is rejected with CAN_ISOTP_CHK_PAD_LEN (RX-SF-011).
 
 ### RX-SF-009
 
@@ -649,7 +650,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** A valid SF received during a segmented reception is delivered and terminates the reception silently (remaining CFs are ignored, no error).
 - **Code:** protocolrx.c:isotp_rcv_sf()
-- **ISO 15765-2:** REVIEW: ISO 15765-2 reports N_UNEXP_PDU for the terminated reception, the implementation reports nothing.
+- **ISO 15765-2:** NOTE: ISO 15765-2 indicates the terminated reception with N_UNEXP_PDU. The socket API has no indication for a discarded PDU, the new PDU is delivered.
 
 ### RX-SF-013
 
@@ -726,7 +727,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** A valid FF during a reception restarts the reception with the new PDU (new FC), the old PDU is discarded silently.
 - **Code:** protocolrx.c:isotp_rcv_ff()
-- **ISO 15765-2:** REVIEW: ISO 15765-2 reports N_UNEXP_PDU for the terminated reception.
+- **ISO 15765-2:** NOTE: ISO 15765-2 indicates the terminated reception with N_UNEXP_PDU. The socket API has no indication for a discarded PDU, the new PDU is received.
 
 ### RX-FF-008
 
@@ -741,7 +742,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** The FC.CTS contains BS and STmin from CAN_ISOTP_RECV_FC (reserved STmin values are rejected by the socket option). wftmax has no effect, FC.WT is never sent.
 - **Code:** protocoltx.c:isotp_send_fc(), isotp.c:isotp_setsockopt_locked()
-- **ISO 15765-2:** REVIEW: N_WFTmax / FC.WT are not implemented (no flow control wait on the receiver side).
+- **ISO 15765-2:** NOTE: N_WFTmax / FC.WT are not implemented on the receiver side: a FF is always answered with FC.CTS (or FC.OVFLW), CAN_ISOTP_RECV_FC.wftmax is stored without effect.
 
 ### RX-FF-010-CC8 .. RX-FF-010-XL9-2048 (3 variants)
 
@@ -1183,7 +1184,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** The FC timeout after a block of CFs is 1 s without frame_txtime (ECOMM).
 - **Code:** protocoltx.c:isotp_rcv_echo() hrtimer_start(txtimer)
-- **ISO 15765-2:** REVIEW: frame_txtime (N_As/N_Ar) is only added to the first N_Bs timeout.
+- **ISO 15765-2:** NOTE: after a block N_Bs is started by the echo of the last CF (its transmission is already confirmed), so frame_txtime is not added. After the FF N_Bs is started at send time and includes frame_txtime (TIM-NBS-002).
 - **Flags:** slow timing
 
 ### TIM-NBS-004
@@ -1257,7 +1258,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** vcan with echo=1 and netem loss 100%: the echo of a FF (with FC) is not monitored, the transfer is aborted by the N_Bs timeout after 1 s + frame_txtime with ECOMM.
 - **Code:** protocoltx.c:isotp_sendmsg() txtimer for ISOTP_WAIT_FIRST_FC
-- **ISO 15765-2:** REVIEW: N_As (missing transmission confirmation) is monitored with 2 s for SF/CF and covered by N_Bs (1 s) for the FF.
+- **ISO 15765-2:** NOTE: the missing transmission confirmation (N_As) of a FF is covered by the N_Bs timeout (1 s + frame_txtime), which is shorter than the 2 s echo timeout for SF/CF.
 - **Flags:** slow timing
 
 ### TIM-ECHO-005

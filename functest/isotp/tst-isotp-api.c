@@ -2058,7 +2058,7 @@ static const struct ft_test tests[] = {
 	  api_opt_undef_flags,
 	  "Undefined flag bits (>= 0x8000) are accepted and stored without error.",
 	  "isotp.c:isotp_setsockopt_locked()",
-	  "REVIEW: no validation of reserved option flags (forward compatibility vs. strictness)."),
+	  "NOTE: intended for forward compatibility: undefined flag bits are ignored (no EINVAL)."),
 	T("API-OPT-013", "CAN_ISOTP_OPTS: padding check flags", 0,
 	  api_opt_padchk,
 	  "CAN_ISOTP_CHK_PAD_DATA needs CAN_ISOTP_RX_PADDING (rxpad_content), else EINVAL and the options are unchanged (also together with CAN_ISOTP_CHK_PAD_LEN). CAN_ISOTP_CHK_PAD_LEN without RX_PADDING (optimized frame length check) is accepted.",
