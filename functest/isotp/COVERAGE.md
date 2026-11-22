@@ -31,8 +31,8 @@ paths that are not reachable with virtual CAN interfaces.
 | | STmin 0x00..0x7F / 0xF1..0xF9 | TIM-STM-002..008 |
 | | frame_txtime in tx_gap | TIM-STM-016..019 |
 | | FC.CTS | TX-SEG-*, TX-FC-001 |
-| | FC.WT (restart N_Bs) | TX-FC-004, TX-FC-005, TX-FC-006, TIM-NBS-004 |
-| | FC.OVFLW => EMSGSIZE | TX-FC-007, TX-FC-008, TX-WTD-003, API-IO-009 |
+| | FC.WT (restart N_Bs) | TX-FC-004, TX-FC-006, TIM-NBS-004 |
+| | FC.OVFLW => EMSGSIZE | TX-FC-007, TX-WTD-003, API-IO-009 |
 | | reserved flow status => EBADMSG | TX-FC-009, TX-WTD-003 |
 | `isotp_rcv_sf()` | SF_DL 0 / SF_DL > CAN_DL - PCI | RX-SF-002, RX-SF-009, XL-SF-001 |
 | | unsigned underflow (CAN_DL < AE + PCI) | RX-SF-003, RX-SF-004, RX-SF-005 (DEVIATION) |
@@ -136,7 +136,7 @@ paths that are not reachable with virtual CAN interfaces.
 | | FF with FC | TX-SEG-* |
 | | SHUTDOWN after the claim | *n/c* (race with close()) |
 | | can_send() error (ENETDOWN, EMSGSIZE) | API-BIND-009, API-BIND-010, XL-MTU-001 |
-| | WAIT_TX_DONE result | TX-WTD-001, TX-WTD-003, TX-FC-006/007/008/009/016/017 |
+| | WAIT_TX_DONE result | TX-WTD-001, TX-WTD-003, TX-FC-006/007/009/016/017 |
 | | WAIT_TX_DONE interrupted by signal | TX-SIG-001 |
 | | WAIT_TX_DONE and SHUTDOWN | *n/c* (race with close()) |
 | | asynchronous result (no WAIT_TX_DONE) | TX-WTD-002, API-IO-009 |

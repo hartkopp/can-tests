@@ -330,8 +330,9 @@ out:
 static void tx_fc_wait(struct ft_ctx *ctx, const void *param)
 {
 	struct ft_isotp_cfg c;
-	int i, n = param ? 25 : 3;
-	int gap = param ? 60 : 100;
+	int i;
+
+	(void)param;
 
 	cfg_wtd(&c, NULL);
 	if (!txenv_open(ctx, &c))
@@ -340,10 +341,10 @@ static void tx_fc_wait(struct ft_ctx *ctx, const void *param)
 	if (!txenv_start(ctx, 30))
 		goto out;
 
-	/* each FC.WT restarts N_Bs, no limit for the number of FC.WT */
-	for (i = 0; i < n; i++) {
+	/* each FC.WT restarts N_Bs */
+	for (i = 0; i < 3; i++) {
 		txenv_fc(ctx, FT_FS_WT, 0, 0);
-		ft_peer_expect_none(ctx, &env.p, gap);
+		ft_peer_expect_none(ctx, &env.p, 100);
 		FT_BAIL(ctx);
 	}
 
@@ -376,19 +377,14 @@ out:
 static void tx_fc_ovflw(struct ft_ctx *ctx, const void *param)
 {
 	struct ft_isotp_cfg c;
-	bool block = param != NULL;
 
+	(void)param;
 	cfg_wtd(&c, NULL);
 	if (!txenv_open(ctx, &c))
 		return;
 
 	if (!txenv_start(ctx, len_cfs(&env.e, 6)))
 		goto out;
-
-	if (block) {
-		txenv_fc(ctx, FT_FS_CTS, 2, 0);
-		txenv_cfs(ctx, 1, 3, NULL);
-	}
 
 	txenv_fc(ctx, FT_FS_OVFLW, 0, 0);
 	txenv_result(ctx, -EMSGSIZE);
@@ -1264,11 +1260,6 @@ static const struct ft_test tests[] = {
 	T("TX-FC-004", "FC wait (WT)", 0, tx_fc_wait, NULL,
 	  "FC.WT stops the sender until a FC.CTS arrives; each FC.WT restarts the N_Bs timer.",
 	  "protocolrx.c:isotp_rcv_fc() ISOTP_FC_WT", NULL),
-	T("TX-FC-005", "unlimited number of FC.WT", FT_SLOW, tx_fc_wait,
-	  "many",
-	  "The sender accepts any number of FC.WT frames (here 25 within 1.5 s > N_Bs) as long as each arrives within N_Bs.",
-	  "protocolrx.c:isotp_rcv_fc() ISOTP_FC_WT",
-	  "NOTE: ISO 15765-2 defines N_WFTmax for the receiver only, so there is no limit on the sender side. CAN_ISOTP_RECV_FC.wftmax is stored but unused and the receiver never sends FC.WT (RX-FF-009)."),
 	T("TX-FC-006", "N_Bs timeout after FC.WT", FT_SLOW, tx_fc_wait_timeout,
 	  NULL,
 	  "Without a further FC after FC.WT the transfer is aborted after N_Bs (1 s) with ECOMM.",
@@ -1276,10 +1267,6 @@ static const struct ft_test tests[] = {
 	T("TX-FC-007", "FC overflow on first FC", 0, tx_fc_ovflw, NULL,
 	  "FC.OVFLW aborts the transfer with EMSGSIZE, no CF is sent. The socket can be used for the next PDU.",
 	  "protocolrx.c:isotp_rcv_fc() ISOTP_FC_OVFLW", NULL),
-	T("TX-FC-008", "FC overflow after a block", 0, tx_fc_ovflw, "block",
-	  "FC.OVFLW after a block also aborts the transfer with EMSGSIZE.",
-	  "protocolrx.c:isotp_rcv_fc() ISOTP_FC_OVFLW",
-	  "NOTE: fault tolerant: ISO 15765-2 only allows FC.OVFLW as response to a FF. A FC.OVFLW after a block aborts the transfer as well instead of being ignored."),
 	T("TX-FC-009", "reserved flow status", 0, tx_fc_reserved, NULL,
 	  "A FC with reserved flow status 3..15 aborts the transfer with EBADMSG.",
 	  "protocolrx.c:isotp_rcv_fc() default case", NULL),

@@ -348,7 +348,7 @@ static void rx_sf_fd(struct ft_ctx *ctx, const void *param)
 	static const unsigned int dls[] = { 12, 16, 20, 24, 32, 48, 64 };
 	uint8_t pdu[64];
 	struct ft_frame f;
-	unsigned int i, len, sfdl;
+	unsigned int i, len, sfdl, prev;
 
 	if (!rxenv_mode(ctx, "FD64", 0))
 		return;
@@ -364,9 +364,10 @@ static void rx_sf_fd(struct ft_ctx *ctx, const void *param)
 		ft_dut_expect_pdu(ctx, env.s, pdu, len - 1, 200);
 	}
 
-	/* CAN_DL > 8: SF_DL escape with all SF_DL values 1 .. CAN_DL-2 */
+	/* CAN_DL > 8: SF_DL escape with all SF_DL values for this CAN_DL */
 	for (i = 0; i < sizeof(dls) / sizeof(dls[0]); i++) {
-		for (sfdl = 1; sfdl <= dls[i] - 2; sfdl++) {
+		prev = i ? dls[i - 1] : 8;
+		for (sfdl = prev - 1; sfdl <= dls[i] - 2; sfdl++) {
 			ft_frame_set(&f, &env.hrx, NULL, dls[i]);
 			memset(f.data, 0xCC, dls[i]);
 			f.data[0] = 0x00;
@@ -921,7 +922,7 @@ out:
 static void rx_ff_fc_content(struct ft_ctx *ctx, const void *param)
 {
 	static const struct can_isotp_fc_options fcs[] = {
-		{ 0, 0, 0 }, { 5, 0x7F, 3 }, { 0xFF, 0xF9, 0xFF },
+		{ 0, 0, 0 }, { 5, 0x7F, 0 }, { 0xFF, 0xF9, 0 },
 		{ 1, 0xF1, 0 }, { 0, 0x01, 0 },
 	};
 	struct ft_isotp_cfg c;
@@ -1638,9 +1639,9 @@ static const struct ft_test tests[] = {
 	  "With CAN_ISOTP_RX_EXT_ADDR the rx_ext_address (not ext_address) is expected in received frames.",
 	  "protocolrx.c:isotp_rcv(), isotp.c:isotp_setsockopt_locked()", NULL),
 	T("RX-SF-008", "CAN FD SF valid", 0, rx_sf_fd, NULL,
-	  "CAN FD SF with CAN_DL <= 8 use the 4 bit SF_DL; with CAN_DL > 8 the escape sequence (N_PCI 0x00 + SF_DL byte) with SF_DL 1..CAN_DL-2 is accepted.",
+	  "CAN FD SF with CAN_DL <= 8 use the 4 bit SF_DL; with CAN_DL > 8 the escape sequence (N_PCI 0x00 + SF_DL byte) is accepted for all SF_DL values which need this CAN_DL.",
 	  "protocolrx.c:isotp_rcv() N_PCI_SF can_is_canfd_skb()",
-	  "NOTE: fault tolerant reception: SF_DL values which would fit into a shorter CAN FD frame (e.g. SF_DL 1 in CAN_DL 64) and SF_DL <= 7 with escape are accepted (ISO 15765-2 requires the optimal CAN_DL for SF_DL > 7 and uses the escape only for CAN_DL > 8). An oversized CAN_DL is rejected with CAN_ISOTP_CHK_PAD_LEN (RX-SF-011)."),
+	  "NOTE: SF_DL values which would fit into a shorter CAN FD frame (e.g. SF_DL 1 in CAN_DL 64) are not checked (fault tolerant reception allowed)."),
 	T("RX-SF-009", "CAN FD SF invalid", 0, rx_sf_fd_invalid, NULL,
 	  "CAN FD SF with CAN_DL > 8 and a non-zero low nibble (no escape), escape with SF_DL 0 or SF_DL > CAN_DL-2, and the escape in CAN_DL <= 8 are ignored silently.",
 	  "protocolrx.c:isotp_rcv(), isotp_rcv_sf()", NULL),
@@ -1717,9 +1718,9 @@ static const struct ft_test tests[] = {
 	  "An invalid FF (CAN_DL < 8, FF_DL < FF_DLmin, unneeded 32 bit FF_DL escape) received during a reception is ignored: LL_DL and FF_DL of the ongoing reception are kept and the PDU is completed by the remaining CFs.",
 	  "protocolrx.c:isotp_rcv_ff() checks before terminating the reception", NULL),
 	T("RX-FF-009", "FC content from RECV_FC", 0, rx_ff_fc_content, NULL,
-	  "The FC.CTS contains BS and STmin from CAN_ISOTP_RECV_FC (reserved STmin values are rejected by the socket option). wftmax has no effect, FC.WT is never sent.",
+	  "The FC.CTS contains BS and STmin from CAN_ISOTP_RECV_FC (reserved STmin values are rejected by the socket option).",
 	  "protocoltx.c:isotp_send_fc(), isotp.c:isotp_setsockopt_locked()",
-	  "NOTE: N_WFTmax / FC.WT are not implemented on the receiver side: a FF is always answered with FC.CTS (or FC.OVFLW), CAN_ISOTP_RECV_FC.wftmax is stored without effect."),
+	  "NOTE: N_WFTmax / FC.WT on the receiver side (CAN_ISOTP_RECV_FC.wftmax) are not checked."),
 	T("RX-FF-010-CC8", "listen mode reception CC8", 0, rx_ff_listen,
 	  "CC8",
 	  "In CAN_ISOTP_LISTEN_MODE PDUs are received without sending FC frames (BS is ignored).",

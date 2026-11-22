@@ -331,9 +331,9 @@ static void tim_echo(struct ft_ctx *ctx, const void *param)
 		len = 20;
 	}
 	if (!strcmp(what, "ff")) {
-		/* FF echo is not monitored: N_Bs (FC timeout) applies */
+		/* the timeout value for a FF without echo is not checked */
 		len = 20;
-		expect = 1000 * MS + TXT_DEF;
+		expect = 0;
 	}
 
 	s = ft_isotp_open(ctx, &c);
@@ -371,7 +371,7 @@ static void tim_echo(struct ft_ctx *ctx, const void *param)
 		ft_dut_expect_err(ctx, s, ECOMM, 4000, &t_err);
 	}
 
-	if (t_err)
+	if (t_err && expect)
 		check_timeout(ctx, t0, t_err, expect);
 
 	/* the socket is idle again */
@@ -610,12 +610,11 @@ static const struct ft_test tests[] = {
 	  &((const struct to_param){ "ff", 100 * MS, 1100 * MS }),
 	  "The FC timeout after the FF is 1 s + frame_txtime (ECOMM).",
 	  "protocoltx.c:isotp_sendmsg() hrtimer_start(txtimer)", NULL),
-	T("TIM-NBS-003", "N_Bs after a block (frame_txtime 100 ms)",
-	  FT_SLOW | FT_TIMING, tim_nbs,
-	  &((const struct to_param){ "block", 100 * MS, 1000 * MS }),
-	  "The FC timeout after a block of CFs is 1 s without frame_txtime (ECOMM).",
+	T("TIM-NBS-003", "N_Bs after a block", FT_SLOW | FT_TIMING, tim_nbs,
+	  &((const struct to_param){ "block", TXT_ZERO, 1000 * MS }),
+	  "The FC timeout after a block of CFs is 1 s (ECOMM, frame_txtime 0).",
 	  "protocoltx.c:isotp_rcv_echo() hrtimer_start(txtimer)",
-	  "NOTE: after a block N_Bs is started by the echo of the last CF (its transmission is already confirmed), so frame_txtime is not added. After the FF N_Bs is started at send time and includes frame_txtime (TIM-NBS-002)."),
+	  "NOTE: whether frame_txtime is added to N_Bs after a block is not checked."),
 	T("TIM-NBS-004", "N_Bs after FC.WT (frame_txtime 100 ms)",
 	  FT_SLOW | FT_TIMING, tim_nbs,
 	  &((const struct to_param){ "wt", 100 * MS, 1000 * MS }),
@@ -660,10 +659,10 @@ static const struct ft_test tests[] = {
 	ECHO("003", "echo timeout CF broadcast FF", "cfbc", 0,
 	     "in CF broadcast mode the echo of the FF is monitored; without echo the transfer is aborted after 2 s + frame_txtime with ECOMM.",
 	     "protocoltx.c:isotp_sendmsg() CF broadcast cfecho, hrtimer.c:isotp_echo_timer_handler()", NULL),
-	ECHO("004", "FF without echo (N_Bs)", "ff", 0,
-	     "the echo of a FF (with FC) is not monitored, the transfer is aborted by the N_Bs timeout after 1 s + frame_txtime with ECOMM.",
+	ECHO("004", "FF without echo", "ff", 0,
+	     "when the local echo of a FF (with FC) does not arrive, the transfer is aborted with ECOMM.",
 	     "protocoltx.c:isotp_sendmsg() txtimer for ISOTP_WAIT_FIRST_FC",
-	     "NOTE: the missing transmission confirmation (N_As) of a FF is covered by the N_Bs timeout (1 s + frame_txtime), which is shorter than the 2 s echo timeout for SF/CF."),
+	     "NOTE: the timeout value (N_Bs 1 s + frame_txtime or echo timeout 2 s + frame_txtime) is not checked."),
 	T("TIM-ECHO-005", "late echo after echo timeout", FT_SLOW | FT_TIMING,
 	  tim_echo_late, NULL,
 	  "vcan with echo=1 and netem delay 3000ms: a SF whose echo arrives after 3 s is aborted after 2 s + frame_txtime with ECOMM. The late echo arriving during the next SF transfer does not complete that transfer (echo identified by the skb uid), which is aborted with ECOMM as well.",

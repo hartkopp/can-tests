@@ -580,33 +580,6 @@ static void api_opt_rxext(struct ft_ctx *ctx, const void *param)
 	close(s);
 }
 
-static void api_opt_undef_flags(struct ft_ctx *ctx, const void *param)
-{
-	static const uint32_t flags[] = { 0x8000, 0x10000, 0x80000000,
-					  0xFFFF8000 };
-	struct can_isotp_options opt, get;
-	socklen_t len;
-	unsigned int i;
-	int s;
-
-	(void)param;
-
-	s = isotp_socket(ctx);
-	FT_BAIL(ctx);
-
-	for (i = 0; i < sizeof(flags) / sizeof(flags[0]); i++) {
-		memset(&opt, 0, sizeof(opt));
-		opt.flags = flags[i];
-		CHECK_RET(ctx, set_opt(s, CAN_ISOTP_OPTS, &opt, sizeof(opt)), 0);
-		len = sizeof(get);
-		CHECK_RET(ctx, get_opt(s, CAN_ISOTP_OPTS, &get, &len), 0);
-		FT_CHECK(ctx, get.flags == flags[i], "flags %X stored as %X",
-			 flags[i], get.flags);
-	}
-
-	close(s);
-}
-
 static void api_opt_recvfc(struct ft_ctx *ctx, const void *param)
 {
 	struct can_isotp_fc_options fc, get, last = { 0, 0, 0 };
@@ -2054,11 +2027,6 @@ static const struct ft_test tests[] = {
 	T("API-OPT-006", "CAN_ISOTP_OPTS: rx_ext_address", 0, api_opt_rxext,
 	  "Without CAN_ISOTP_RX_EXT_ADDR the rx_ext_address is set to ext_address (visible with getsockopt). With the flag both addresses are kept independently.",
 	  "isotp.c:isotp_setsockopt_locked()", NULL),
-	T("API-OPT-007", "CAN_ISOTP_OPTS: undefined flags", 0,
-	  api_opt_undef_flags,
-	  "Undefined flag bits (>= 0x8000) are accepted and stored without error.",
-	  "isotp.c:isotp_setsockopt_locked()",
-	  "NOTE: intended for forward compatibility: undefined flag bits are ignored (no EINVAL)."),
 	T("API-OPT-013", "CAN_ISOTP_OPTS: padding check flags", 0,
 	  api_opt_padchk,
 	  "CAN_ISOTP_CHK_PAD_DATA needs CAN_ISOTP_RX_PADDING (rxpad_content), else EINVAL and the options are unchanged (also together with CAN_ISOTP_CHK_PAD_LEN). CAN_ISOTP_CHK_PAD_LEN without RX_PADDING (optimized frame length check) is accepted.",

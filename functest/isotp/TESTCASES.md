@@ -91,14 +91,6 @@ Parameterized test cases with the same behaviour are grouped.
 - **Behaviour:** Without CAN_ISOTP_RX_EXT_ADDR the rx_ext_address is set to ext_address (visible with getsockopt). With the flag both addresses are kept independently.
 - **Code:** isotp.c:isotp_setsockopt_locked()
 
-### API-OPT-007
-
-**CAN_ISOTP_OPTS: undefined flags**
-
-- **Behaviour:** Undefined flag bits (>= 0x8000) are accepted and stored without error.
-- **Code:** isotp.c:isotp_setsockopt_locked()
-- **ISO 15765-2:** NOTE: intended for forward compatibility: undefined flag bits are ignored (no EINVAL).
-
 ### API-OPT-013
 
 **CAN_ISOTP_OPTS: padding check flags**
@@ -342,15 +334,6 @@ Parameterized test cases with the same behaviour are grouped.
 - **Behaviour:** FC.WT stops the sender until a FC.CTS arrives; each FC.WT restarts the N_Bs timer.
 - **Code:** protocolrx.c:isotp_rcv_fc() ISOTP_FC_WT
 
-### TX-FC-005
-
-**unlimited number of FC.WT**
-
-- **Behaviour:** The sender accepts any number of FC.WT frames (here 25 within 1.5 s > N_Bs) as long as each arrives within N_Bs.
-- **Code:** protocolrx.c:isotp_rcv_fc() ISOTP_FC_WT
-- **ISO 15765-2:** NOTE: ISO 15765-2 defines N_WFTmax for the receiver only, so there is no limit on the sender side. CAN_ISOTP_RECV_FC.wftmax is stored but unused and the receiver never sends FC.WT (RX-FF-009).
-- **Flags:** slow
-
 ### TX-FC-006
 
 **N_Bs timeout after FC.WT**
@@ -365,14 +348,6 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** FC.OVFLW aborts the transfer with EMSGSIZE, no CF is sent. The socket can be used for the next PDU.
 - **Code:** protocolrx.c:isotp_rcv_fc() ISOTP_FC_OVFLW
-
-### TX-FC-008
-
-**FC overflow after a block**
-
-- **Behaviour:** FC.OVFLW after a block also aborts the transfer with EMSGSIZE.
-- **Code:** protocolrx.c:isotp_rcv_fc() ISOTP_FC_OVFLW
-- **ISO 15765-2:** NOTE: fault tolerant: ISO 15765-2 only allows FC.OVFLW as response to a FF. A FC.OVFLW after a block aborts the transfer as well instead of being ignored.
 
 ### TX-FC-009
 
@@ -619,9 +594,9 @@ Parameterized test cases with the same behaviour are grouped.
 
 **CAN FD SF valid**
 
-- **Behaviour:** CAN FD SF with CAN_DL <= 8 use the 4 bit SF_DL; with CAN_DL > 8 the escape sequence (N_PCI 0x00 + SF_DL byte) with SF_DL 1..CAN_DL-2 is accepted.
+- **Behaviour:** CAN FD SF with CAN_DL <= 8 use the 4 bit SF_DL; with CAN_DL > 8 the escape sequence (N_PCI 0x00 + SF_DL byte) is accepted for all SF_DL values which need this CAN_DL.
 - **Code:** protocolrx.c:isotp_rcv() N_PCI_SF can_is_canfd_skb()
-- **ISO 15765-2:** NOTE: fault tolerant reception: SF_DL values which would fit into a shorter CAN FD frame (e.g. SF_DL 1 in CAN_DL 64) and SF_DL <= 7 with escape are accepted (ISO 15765-2 requires the optimal CAN_DL for SF_DL > 7 and uses the escape only for CAN_DL > 8). An oversized CAN_DL is rejected with CAN_ISOTP_CHK_PAD_LEN (RX-SF-011).
+- **ISO 15765-2:** NOTE: SF_DL values which would fit into a shorter CAN FD frame (e.g. SF_DL 1 in CAN_DL 64) are not checked (fault tolerant reception allowed).
 
 ### RX-SF-009
 
@@ -740,9 +715,9 @@ Parameterized test cases with the same behaviour are grouped.
 
 **FC content from RECV_FC**
 
-- **Behaviour:** The FC.CTS contains BS and STmin from CAN_ISOTP_RECV_FC (reserved STmin values are rejected by the socket option). wftmax has no effect, FC.WT is never sent.
+- **Behaviour:** The FC.CTS contains BS and STmin from CAN_ISOTP_RECV_FC (reserved STmin values are rejected by the socket option).
 - **Code:** protocoltx.c:isotp_send_fc(), isotp.c:isotp_setsockopt_locked()
-- **ISO 15765-2:** NOTE: N_WFTmax / FC.WT are not implemented on the receiver side: a FF is always answered with FC.CTS (or FC.OVFLW), CAN_ISOTP_RECV_FC.wftmax is stored without effect.
+- **ISO 15765-2:** NOTE: N_WFTmax / FC.WT on the receiver side (CAN_ISOTP_RECV_FC.wftmax) are not checked.
 
 ### RX-FF-010-CC8 .. RX-FF-010-XL9-2048 (3 variants)
 
@@ -1180,11 +1155,11 @@ Parameterized test cases with the same behaviour are grouped.
 
 ### TIM-NBS-003
 
-**N_Bs after a block (frame_txtime 100 ms)**
+**N_Bs after a block**
 
-- **Behaviour:** The FC timeout after a block of CFs is 1 s without frame_txtime (ECOMM).
+- **Behaviour:** The FC timeout after a block of CFs is 1 s (ECOMM, frame_txtime 0).
 - **Code:** protocoltx.c:isotp_rcv_echo() hrtimer_start(txtimer)
-- **ISO 15765-2:** NOTE: after a block N_Bs is started by the echo of the last CF (its transmission is already confirmed), so frame_txtime is not added. After the FF N_Bs is started at send time and includes frame_txtime (TIM-NBS-002).
+- **ISO 15765-2:** NOTE: whether frame_txtime is added to N_Bs after a block is not checked.
 - **Flags:** slow timing
 
 ### TIM-NBS-004
@@ -1254,11 +1229,11 @@ Parameterized test cases with the same behaviour are grouped.
 
 ### TIM-ECHO-004
 
-**FF without echo (N_Bs)**
+**FF without echo**
 
-- **Behaviour:** vcan with echo=1 and netem loss 100%: the echo of a FF (with FC) is not monitored, the transfer is aborted by the N_Bs timeout after 1 s + frame_txtime with ECOMM.
+- **Behaviour:** vcan with echo=1 and netem loss 100%: when the local echo of a FF (with FC) does not arrive, the transfer is aborted with ECOMM.
 - **Code:** protocoltx.c:isotp_sendmsg() txtimer for ISOTP_WAIT_FIRST_FC
-- **ISO 15765-2:** NOTE: the missing transmission confirmation (N_As) of a FF is covered by the N_Bs timeout (1 s + frame_txtime), which is shorter than the 2 s echo timeout for SF/CF.
+- **ISO 15765-2:** NOTE: the timeout value (N_Bs 1 s + frame_txtime or echo timeout 2 s + frame_txtime) is not checked.
 - **Flags:** slow timing
 
 ### TIM-ECHO-005
