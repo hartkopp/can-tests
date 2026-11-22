@@ -187,7 +187,7 @@ paths that are not reachable with virtual CAN interfaces.
 | | CAN_ISOTP_OPTS checks / rx_ext_address / frame_txtime | API-OPT-004..007, TIM-STM-016..019 |
 | | CAN_ISOTP_RECV_FC | API-OPT-008, RX-FF-009 |
 | | CAN_ISOTP_TX_STMIN / RX_STMIN | API-OPT-009, TIM-STM-013..015, RX-CF-009 |
-| | CAN_ISOTP_LL_OPTS checks | API-OPT-010 |
+| | CAN_ISOTP_LL_OPTS checks (CAN FD tx_flags: BRS/FDF only) | API-OPT-010, TX-FL-001 |
 | | CAN_ISOTP_XL_OPTS checks / disable | API-OPT-011, XL-OPT-001, XL-OPT-002 |
 | | default => ENOPROTOOPT | unreachable (checked in `isotp_setsockopt()`) |
 | `isotp_setsockopt()` | level / option name / optlen / EFAULT | API-OPT-003 |

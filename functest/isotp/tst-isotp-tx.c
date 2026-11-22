@@ -976,12 +976,25 @@ static void tx_eff(struct ft_ctx *ctx, const void *param)
 
 static void tx_fd_flags(struct ft_ctx *ctx, const void *param)
 {
-	static const uint8_t flags[] = { CANFD_BRS, CANFD_ESI,
-					 CANFD_BRS | CANFD_ESI, CANFD_FDF,
-					 0xFF };
+	static const uint8_t flags[] = { 0, CANFD_BRS, CANFD_FDF,
+					 CANFD_BRS | CANFD_FDF };
+	static const uint8_t bad[] = { CANFD_ESI, CANFD_BRS | CANFD_ESI,
+				       0x08, 0xFF };
 	static uint8_t data[200];
 	struct ft_isotp_cfg c;
 	unsigned int i;
+	int s;
+
+	/* CANFD_ESI and undefined flags are rejected by CAN_ISOTP_LL_OPTS */
+	for (i = 0; i < sizeof(bad); i++) {
+		cfg_wtd(&c, "FD64");
+		c.ll.tx_flags = bad[i];
+		s = ft_isotp_open_err(&c);
+		FT_CHECK(ctx, s == -EINVAL, "tx_flags %02X: %s", bad[i],
+			 ft_errname(s >= 0 ? 0 : s));
+		if (s >= 0)
+			close(s);
+	}
 
 	for (i = 0; i < sizeof(flags); i++) {
 		cfg_wtd(&c, "FD64");
@@ -1277,12 +1290,12 @@ static const struct ft_test tests[] = {
 	  &((const struct fc_short_param){ FT_V_PLAIN }),
 	  "A frame without N_PCI (CAN_DL < 1, +1 with extended addressing) is no N_PDU and is ignored. A FC with N_PCI and CAN_DL < 3 (+1 with extended addressing) aborts the transfer with EBADMSG. Data bytes beyond CAN_DL are not used.",
 	  "protocolrx.c:isotp_rcv() N_PCI length check, isotp_rcv_fc()",
-	  "DEVIATION (if observed): a FC without N_PCI is processed with data beyond CAN_DL (EBADMSG), fixed by xl-isotp split_v2 patch 14."),
+	  "DEVIATION (if observed): a FC without N_PCI is processed with data beyond CAN_DL (EBADMSG), fixed by xl-isotp split_v2 patch 15."),
 	T("TX-FC-010-ae", "FC too short (ext. addressing)", 0, tx_fc_short,
 	  &((const struct fc_short_param){ FT_V_AE }),
 	  "A frame without N_PCI (CAN_DL < 1, +1 with extended addressing) is no N_PDU and is ignored. A FC with N_PCI and CAN_DL < 3 (+1 with extended addressing) aborts the transfer with EBADMSG. Data bytes beyond CAN_DL are not used.",
 	  "protocolrx.c:isotp_rcv() N_PCI length check, isotp_rcv_fc()",
-	  "DEVIATION (if observed): a FC without N_PCI is processed with data beyond CAN_DL (EBADMSG), fixed by xl-isotp split_v2 patch 14."),
+	  "DEVIATION (if observed): a FC without N_PCI is processed with data beyond CAN_DL (EBADMSG), fixed by xl-isotp split_v2 patch 15."),
 	T("TX-FC-011", "FC padding checks", 0, tx_fc_pad, NULL,
 	  "With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING rejects every FC. The checks also apply to FCs of CAN XL N_PDUs (e.g. RX_PADDING|CHK_PAD_LEN rejects CAN_DL 100), without checks any CAN_DL is accepted. Failing FCs abort the transfer with EBADMSG.",
 	  "protocolrx.c:isotp_rcv_fc(), chk_pad_fail(), chk_optimized_fail()",
@@ -1354,9 +1367,8 @@ static const struct ft_test tests[] = {
 	  "29 bit CAN IDs (CAN_EFF_FLAG) are used for tx_id and rx_id.",
 	  "protocoltx.c:isotp_fill_frame_head()", NULL),
 	T("TX-FL-001", "CAN FD tx_flags", 0, tx_fd_flags, NULL,
-	  "The LL tx_flags are copied into each CAN FD frame (CANFD_FDF is added by the CAN core), also undefined bits.",
-	  "protocoltx.c:isotp_fill_frame_head(), af_can.c:can_send()",
-	  "REVIEW: undefined CAN FD flags and CANFD_ESI are sent as configured."),
+	  "The LL tx_flags (only CANFD_BRS and CANFD_FDF are accepted, CANFD_ESI and undefined bits are rejected with EINVAL) are copied into each CAN FD frame (CANFD_FDF is added by the CAN core).",
+	  "isotp.c:isotp_setsockopt_locked(), protocoltx.c:isotp_fill_frame_head(), af_can.c:can_send()", NULL),
 	T("TX-WTD-001", "WAIT_TX_DONE blocks until done", 0, tx_wtd_block,
 	  NULL,
 	  "With CAN_ISOTP_WAIT_TX_DONE send() blocks until the transfer is complete and returns the PDU length.",
