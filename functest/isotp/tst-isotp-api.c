@@ -446,6 +446,50 @@ static void api_opt_bcflags(struct ft_ctx *ctx, const void *param)
 	close(s);
 }
 
+static void api_opt_padchk(struct ft_ctx *ctx, const void *param)
+{
+	static const struct {
+		uint32_t flags;
+		int ret;
+	} tc[] = {
+		{ CAN_ISOTP_CHK_PAD_DATA, -EINVAL },
+		{ CAN_ISOTP_CHK_PAD_DATA | CAN_ISOTP_CHK_PAD_LEN, -EINVAL },
+		{ CAN_ISOTP_CHK_PAD_DATA | CAN_ISOTP_TX_PADDING, -EINVAL },
+		{ CAN_ISOTP_CHK_PAD_LEN, 0 },
+		{ CAN_ISOTP_RX_PADDING | CAN_ISOTP_CHK_PAD_DATA, 0 },
+		{ CAN_ISOTP_RX_PADDING | CAN_ISOTP_CHK_PAD_LEN |
+		  CAN_ISOTP_CHK_PAD_DATA, 0 },
+	};
+	struct can_isotp_options opt, get;
+	socklen_t len;
+	unsigned int i;
+	int s;
+
+	(void)param;
+
+	s = isotp_socket(ctx);
+	FT_BAIL(ctx);
+
+	for (i = 0; i < sizeof(tc) / sizeof(tc[0]); i++) {
+		memset(&opt, 0, sizeof(opt));
+		opt.flags = CAN_ISOTP_WAIT_TX_DONE;
+		CHECK_RET(ctx, set_opt(s, CAN_ISOTP_OPTS, &opt, sizeof(opt)), 0);
+
+		opt.flags = tc[i].flags;
+		ft_log(ctx, "flags %03X", tc[i].flags);
+		CHECK_RET(ctx, set_opt(s, CAN_ISOTP_OPTS, &opt, sizeof(opt)),
+			  tc[i].ret);
+
+		len = sizeof(get);
+		CHECK_RET(ctx, get_opt(s, CAN_ISOTP_OPTS, &get, &len), 0);
+		FT_CHECK(ctx, get.flags == (tc[i].ret ? CAN_ISOTP_WAIT_TX_DONE :
+					    tc[i].flags),
+			 "flags %03X: stored flags %03X", tc[i].flags, get.flags);
+	}
+
+	close(s);
+}
+
 static void api_opt_txtime(struct ft_ctx *ctx, const void *param)
 {
 	static const struct {
@@ -2015,6 +2059,10 @@ static const struct ft_test tests[] = {
 	  "Undefined flag bits (>= 0x8000) are accepted and stored without error.",
 	  "isotp.c:isotp_setsockopt_locked()",
 	  "REVIEW: no validation of reserved option flags (forward compatibility vs. strictness)."),
+	T("API-OPT-013", "CAN_ISOTP_OPTS: padding check flags", 0,
+	  api_opt_padchk,
+	  "CAN_ISOTP_CHK_PAD_DATA needs CAN_ISOTP_RX_PADDING (rxpad_content), else EINVAL and the options are unchanged (also together with CAN_ISOTP_CHK_PAD_LEN). CAN_ISOTP_CHK_PAD_LEN without RX_PADDING (optimized frame length check) is accepted.",
+	  "isotp.c:isotp_setsockopt_locked() CAN_ISOTP_OPTS", NULL),
 	T("API-OPT-008", "CAN_ISOTP_RECV_FC values", 0, api_opt_recvfc,
 	  "CAN_ISOTP_RECV_FC stores bs and wftmax without checks. The reserved STmin values (0x80..0xF0, 0xFA..0xFF) are rejected with EINVAL and leave the stored values unchanged.",
 	  "isotp.c:isotp_setsockopt_locked() CAN_ISOTP_RECV_FC", NULL),

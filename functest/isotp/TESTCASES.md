@@ -98,6 +98,13 @@ Parameterized test cases with the same behaviour are grouped.
 - **Code:** isotp.c:isotp_setsockopt_locked()
 - **ISO 15765-2:** REVIEW: no validation of reserved option flags (forward compatibility vs. strictness).
 
+### API-OPT-013
+
+**CAN_ISOTP_OPTS: padding check flags**
+
+- **Behaviour:** CAN_ISOTP_CHK_PAD_DATA needs CAN_ISOTP_RX_PADDING (rxpad_content), else EINVAL and the options are unchanged (also together with CAN_ISOTP_CHK_PAD_LEN). CAN_ISOTP_CHK_PAD_LEN without RX_PADDING (optimized frame length check) is accepted.
+- **Code:** isotp.c:isotp_setsockopt_locked() CAN_ISOTP_OPTS
+
 ### API-OPT-008
 
 **CAN_ISOTP_RECV_FC values**
@@ -380,15 +387,14 @@ Parameterized test cases with the same behaviour are grouped.
 - **Variants:** `TX-FC-010-plain`, `TX-FC-010-ae`
 - **Behaviour:** A frame without N_PCI (CAN_DL < 1, +1 with extended addressing) is no N_PDU and is ignored. A FC with N_PCI and CAN_DL < 3 (+1 with extended addressing) aborts the transfer with EBADMSG. Data bytes beyond CAN_DL are not used.
 - **Code:** protocolrx.c:isotp_rcv() N_PCI length check, isotp_rcv_fc()
-- **ISO 15765-2:** DEVIATION (if observed): a FC without N_PCI is processed with data beyond CAN_DL (EBADMSG), fixed by xl-isotp split_v2 patch 16.
+- **ISO 15765-2:** DEVIATION (if observed): a FC without N_PCI is processed with data beyond CAN_DL (EBADMSG), fixed by xl-isotp split_v2 patch 17.
 
 ### TX-FC-011
 
 **FC padding checks**
 
-- **Behaviour:** With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING\|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING\|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING rejects every FC. The checks also apply to FCs of CAN XL N_PDUs (e.g. RX_PADDING\|CHK_PAD_LEN rejects CAN_DL 100), without checks any CAN_DL is accepted. Failing FCs abort the transfer with EBADMSG.
+- **Behaviour:** With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING\|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING\|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING is rejected by CAN_ISOTP_OPTS (API-OPT-013). The checks also apply to FCs of CAN XL N_PDUs (e.g. RX_PADDING\|CHK_PAD_LEN rejects CAN_DL 100), without checks any CAN_DL is accepted. Failing FCs abort the transfer with EBADMSG.
 - **Code:** protocolrx.c:isotp_rcv_fc(), chk_pad_fail(), chk_optimized_fail()
-- **ISO 15765-2:** REVIEW: CAN_ISOTP_CHK_PAD_DATA without CAN_ISOTP_RX_PADDING makes every frame fail the check (configuration not rejected).
 
 ### TX-FC-012
 
@@ -634,7 +640,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **SF padding checks**
 
-- **Behaviour:** CHK_PAD_LEN without RX_PADDING requires the optimized length (CC: exact, FD: next DLC length after the data); RX_PADDING\|CHK_PAD_LEN requires a valid CAN FD DLC length >= 8; RX_PADDING\|CHK_PAD_DATA requires rxpad_content in all bytes after the data; CHK_PAD_DATA without RX_PADDING fails always. Failures are reported as EBADMSG and the PDU is dropped.
+- **Behaviour:** CHK_PAD_LEN without RX_PADDING requires the optimized length (CC: exact, FD: next DLC length after the data); RX_PADDING\|CHK_PAD_LEN requires a valid CAN FD DLC length >= 8; RX_PADDING\|CHK_PAD_DATA requires rxpad_content in all bytes after the data; CHK_PAD_DATA without RX_PADDING is rejected by CAN_ISOTP_OPTS (API-OPT-013). Failures are reported as EBADMSG and the PDU is dropped.
 - **Code:** protocolrx.c:isotp_rcv_sf(), chk_pad_fail(), chk_optimized_fail()
 
 ### RX-SF-012
@@ -688,7 +694,7 @@ Parameterized test cases with the same behaviour are grouped.
 - **Variants:** `RX-FF-004-CC8`, `RX-FF-004-CC8-ae`, `RX-FF-004-FD64`, `RX-FF-004-XL9-2048`
 - **Behaviour:** A FF with FF_DL < FF_DLmin (the PDU fits into a SF of the sender LL_DL: 7-ae for LL_DL 8, LL_DL-2-ae else) is ignored, FF_DL >= FF_DLmin is answered with a FC.
 - **Code:** protocolrx.c:isotp_rcv_ff() FF_DLmin check
-- **ISO 15765-2:** DEVIATION (if observed): CAN CC FF_DL 7 (normal) / 6 (extended addressing) is accepted although it fits into a SF (ISO 15765-2 FF_DLmin 8 / 7), fixed by xl-isotp split_v2 patch 18.
+- **ISO 15765-2:** DEVIATION (if observed): CAN CC FF_DL 7 (normal) / 6 (extended addressing) is accepted although it fits into a SF (ISO 15765-2 FF_DLmin 8 / 7), fixed by xl-isotp split_v2 patch 19.
 
 ### RX-FF-005
 
@@ -703,7 +709,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** Expected: in CAN_ISOTP_LISTEN_MODE no frames are sent. Observed behaviour for a FF with FF_DL > max_pdu_size is reported.
 - **Code:** protocolrx.c:isotp_rcv_ff() isotp_send_fc(OVFLW) before the LISTEN_MODE check
-- **ISO 15765-2:** DEVIATION (if observed): a FC.OVFLW is sent in listen mode, which can abort transfers between other nodes (fixed by xl-isotp split_v2 patch 20).
+- **ISO 15765-2:** DEVIATION (if observed): a FC.OVFLW is sent in listen mode, which can abort transfers between other nodes (fixed by xl-isotp split_v2 patch 21).
 
 ### RX-FF-011 .. RX-FF-011-ae (2 variants)
 
@@ -788,7 +794,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** Only the last CF may be shorter than LL_DL and it has to contain all remaining bytes of the PDU. A short CF lacking bytes (here 3 of 7) is ignored and the reception continues with the correct CF.
 - **Code:** protocolrx.c:isotp_rcv_cf() last CF length check
-- **ISO 15765-2:** DEVIATION (if observed): the short CF is accepted, consumes a SN and the reception waits for further CFs (fixed by xl-isotp split_v2 patch 19).
+- **ISO 15765-2:** DEVIATION (if observed): the short CF is accepted, consumes a SN and the reception waits for further CFs (fixed by xl-isotp split_v2 patch 20).
 
 ### RX-CF-015
 
@@ -796,7 +802,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** A CF with only the N_PCI (no data) is a short CF lacking bytes and is ignored; the reception continues with the correct CF.
 - **Code:** protocolrx.c:isotp_rcv_cf() last CF length check
-- **ISO 15765-2:** DEVIATION (if observed): the empty CF is accepted and consumes a SN (fixed by xl-isotp split_v2 patch 19).
+- **ISO 15765-2:** DEVIATION (if observed): the empty CF is accepted and consumes a SN (fixed by xl-isotp split_v2 patch 20).
 
 ### RX-CF-007-CC8 .. RX-CF-007-FD64 (2 variants)
 
@@ -937,7 +943,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** In SDT 7 (CAN FD tunnel) mode the AF bit 30 (BRS) is ignored at reception time, frames with AF bit 31 (CiA 611-1 ZDLC, zero data length) are dropped.
 - **Code:** protocolrx.c:isotp_check_frame_head() CAN_CIA_SDT_ZDLC
-- **ISO 15765-2:** DEVIATION (if observed): tunneled ZDLC frames are processed (fixed by xl-isotp split_v2 patch 34).
+- **ISO 15765-2:** DEVIATION (if observed): tunneled ZDLC frames are processed (fixed by xl-isotp split_v2 patch 35).
 
 ### XL-HDR-005
 
@@ -959,7 +965,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** In SDT 6 (CAN CC tunnel) mode frames with AF bit 30 (CiA 611-1 RTR) or bit 31 (ZDLC, zero data length) are dropped.
 - **Code:** protocolrx.c:isotp_check_frame_head() CAN_CIA_SDT6_RTR, CAN_CIA_SDT_ZDLC
-- **ISO 15765-2:** DEVIATION (if observed): tunneled RTR/ZDLC frames are processed (fixed by xl-isotp split_v2 patch 34).
+- **ISO 15765-2:** DEVIATION (if observed): tunneled RTR/ZDLC frames are processed (fixed by xl-isotp split_v2 patch 35).
 
 ### XL-SF-001
 
@@ -988,7 +994,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** Expected: a CAN CC tunnel (SDT 6) socket only processes frames with CAN_DL <= 8. Observed behaviour is reported.
 - **Code:** protocolrx.c:isotp_rcv(), isotp_rcv_ff() (no SDT 6 specific length check)
-- **ISO 15765-2:** DEVIATION (if observed): SDT 6 sockets accept SF/FF/CF with CAN_DL > 8 (fixed by xl-isotp split_v2 patch 34).
+- **ISO 15765-2:** DEVIATION (if observed): SDT 6 sockets accept SF/FF/CF with CAN_DL > 8 (fixed by xl-isotp split_v2 patch 35).
 
 ### XL-SDT7-001
 
@@ -1003,7 +1009,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 - **Behaviour:** Expected: a CAN FD tunnel (SDT 7) socket only processes frames with a CAN FD data length (<= 8 or a DLC length up to 64). Observed behaviour for SF in the CAN XL SF format with CAN_DL 100 and 13 is reported; a valid CAN FD SF is received.
 - **Code:** protocolrx.c:isotp_check_frame_head() tunnel length check, isotp_rcv() N_PCI_XL_SF
-- **ISO 15765-2:** DEVIATION (if observed): SDT 7 sockets accept SF with CAN_DL > 64 or without CAN FD DLC length (fixed by xl-isotp split_v2 patch 34).
+- **ISO 15765-2:** DEVIATION (if observed): SDT 7 sockets accept SF with CAN_DL > 64 or without CAN FD DLC length (fixed by xl-isotp split_v2 patch 35).
 
 ### XL-SDT7-003
 
