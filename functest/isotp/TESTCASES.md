@@ -388,7 +388,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **FC padding checks**
 
-- **Behaviour:** With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING\|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING\|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING rejects every FC. In XL mode (CAN XL N_PDUs, no padding) a FC with CAN_DL > 8 is not checked for padding. Failing FCs abort the transfer with EBADMSG.
+- **Behaviour:** With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING\|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING\|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING rejects every FC. The checks also apply to FCs of CAN XL N_PDUs (e.g. RX_PADDING\|CHK_PAD_LEN rejects CAN_DL 100), without checks any CAN_DL is accepted. Failing FCs abort the transfer with EBADMSG.
 - **Code:** protocolrx.c:isotp_rcv_fc(), chk_pad_fail(), chk_optimized_fail()
 - **ISO 15765-2:** REVIEW: CAN_ISOTP_CHK_PAD_DATA without CAN_ISOTP_RX_PADDING makes every frame fail the check (configuration not rejected).
 
@@ -977,8 +977,8 @@ Parameterized test cases with the same behaviour are grouped.
 
 **CAN XL N_PDUs with padding checks**
 
-- **Behaviour:** CAN XL N_PDUs (LL mtu 16, CAN_DL resp. RX_DL > 8) are not padded: with RX_PADDING/CHK_PAD_* flags SF with any CAN_DL > 8 (also with bytes behind the SF data) and segmented PDUs with unpadded last CFs (also CAN_DL <= 8) are received without padding checks. A SF with CAN_DL > 8 always needs the XL SF PCI flag (the CAN FD escape 0x00 is ignored). Frames with CAN_DL <= 8 (SF) follow the CAN CC padding rules.
-- **Code:** protocolrx.c:isotp_rcv() N_PCI_XL_SF, chk_pad_fail() ll_dl
+- **Behaviour:** Enabled rx padding checks (RX_PADDING/CHK_PAD_*) keep their CAN CC/FD semantics also for CAN XL N_PDUs (LL mtu 16): with RX_PADDING\|CHK_PAD_LEN a SF with CAN_DL > 8 must have a CAN FD DLC length (else EBADMSG) and CHK_PAD_DATA checks the bytes behind the data. A SF with CAN_DL > 8 always needs the XL SF PCI flag (the CAN FD escape 0x00 is ignored).
+- **Code:** protocolrx.c:isotp_rcv() N_PCI_XL_SF, chk_pad_fail()
 
 ### XL-CF-001
 

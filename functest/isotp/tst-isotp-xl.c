@@ -409,11 +409,9 @@ static void xl_sf_native(struct ft_ctx *ctx, const void *param)
 
 static void xl_sf_pad(struct ft_ctx *ctx, const void *param)
 {
-	static uint8_t pdu[300];
 	struct ft_isotp_cfg c;
-	struct ft_enc e;
 
-	/* CAN XL N_PDUs are not padded: no padding checks for CAN_DL > 8 */
+	/* enabled rx padding checks follow the CAN CC/FD rules */
 	cfg_xl(&c, "XL9-2048");
 	c.opts.flags |= CAN_ISOTP_RX_PADDING | CAN_ISOTP_CHK_PAD_LEN |
 			CAN_ISOTP_CHK_PAD_DATA;
@@ -421,10 +419,10 @@ static void xl_sf_pad(struct ft_ctx *ctx, const void *param)
 	if (!xlenv_open(ctx, &c))
 		return;
 
-	xl_sf(ctx, 12, 0x08, 10, 2, 10, 1);	/* XL SF */
-	xl_sf(ctx, 11, 0x08, 9, 2, 9, 1);	/* no CAN FD DLC length */
-	xl_sf(ctx, 100, 0x08, 98, 2, 98, 1);	/* > 64 */
+	xl_sf(ctx, 12, 0x08, 10, 2, 10, 1);	/* XL SF, CAN FD DLC length */
 	xl_sf(ctx, 64, 0x08, 7, 2, 7, 1);	/* 0xCC behind the SF data */
+	xl_sf(ctx, 11, 0x08, 9, 2, 9, -EBADMSG); /* no CAN FD DLC length */
+	xl_sf(ctx, 100, 0x08, 98, 2, 98, -EBADMSG); /* > 64 */
 	xl_sf(ctx, 12, 0x00, 10, 2, 10, 0);	/* FD style escape */
 	xl_sf(ctx, 11, 0x00, 9, 2, 9, 0);
 	xl_sf(ctx, 12, 0x05, 0, 1, 5, 0);	/* 4 bit SF_DL */
@@ -433,14 +431,6 @@ static void xl_sf_pad(struct ft_ctx *ctx, const void *param)
 	xl_sf(ctx, 8, 0x03, 0, 1, 3, 1);
 	xl_sf(ctx, 4, 0x03, 0, 1, 3, -EBADMSG);
 
-	/* segmented XL N_PDU (LL_DL 100) with unpadded last CF */
-	ft_pattern(pdu, sizeof(pdu), 0x21);
-	e = env.pe;
-	e.ll_dl = 100;
-	ft_rx_pdu(ctx, env.s, &c, &env.p, &e, pdu, 150);  /* last CF 53 */
-	ft_rx_pdu(ctx, env.s, &c, &env.p, &e, pdu, 201);  /* last CF 5 */
-
-	ft_dut_expect_noerr(ctx, env.s);
 	ft_peer_expect_none(ctx, &env.p, 10);
 	xlenv_close();
 }
@@ -900,8 +890,8 @@ static const struct ft_test tests[] = {
 	  "protocolrx.c:isotp_rcv() N_PCI_XL_SF, isotp_rcv_sf()", NULL),
 	T("XL-SF-002", "CAN XL N_PDUs with padding checks", 0, xl_sf_pad,
 	  NULL,
-	  "CAN XL N_PDUs (LL mtu 16, CAN_DL resp. RX_DL > 8) are not padded: with RX_PADDING/CHK_PAD_* flags SF with any CAN_DL > 8 (also with bytes behind the SF data) and segmented PDUs with unpadded last CFs (also CAN_DL <= 8) are received without padding checks. A SF with CAN_DL > 8 always needs the XL SF PCI flag (the CAN FD escape 0x00 is ignored). Frames with CAN_DL <= 8 (SF) follow the CAN CC padding rules.",
-	  "protocolrx.c:isotp_rcv() N_PCI_XL_SF, chk_pad_fail() ll_dl", NULL),
+	  "Enabled rx padding checks (RX_PADDING/CHK_PAD_*) keep their CAN CC/FD semantics also for CAN XL N_PDUs (LL mtu 16): with RX_PADDING|CHK_PAD_LEN a SF with CAN_DL > 8 must have a CAN FD DLC length (else EBADMSG) and CHK_PAD_DATA checks the bytes behind the data. A SF with CAN_DL > 8 always needs the XL SF PCI flag (the CAN FD escape 0x00 is ignored).",
+	  "protocolrx.c:isotp_rcv() N_PCI_XL_SF, chk_pad_fail()", NULL),
 	T("XL-CF-001", "CAN XL last CF length", 0, xl_cf_len, NULL,
 	  "Like for CAN CC/FD only the presence of the PDU data is checked: a last CF of a CAN XL N_PDU (RX_DL > 8) with more bytes than the missing PDU data (also with CAN_DL <= 8) completes the PDU.",
 	  "protocolrx.c:isotp_rcv_cf()", NULL),

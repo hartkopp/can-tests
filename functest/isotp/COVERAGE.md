@@ -37,7 +37,7 @@ paths that are not reachable with virtual CAN interfaces.
 | `isotp_rcv_sf()` | SF_DL 0 / SF_DL > CAN_DL - PCI | RX-SF-002, RX-SF-009, XL-SF-001 |
 | | unsigned underflow (CAN_DL < AE + PCI) | RX-SF-003, RX-SF-004, RX-SF-005 (DEVIATION) |
 | | padding check fail => EBADMSG | RX-SF-011, XL-SF-002 |
-| | CAN XL N_PDUs: no padding checks | XL-SF-002 |
+| | CAN XL N_PDUs: enabled padding checks with CC/FD rules | XL-SF-002, TX-FC-011 |
 | | CAN XL N_PDUs: data presence only (no exact SF / last CF / FC length) | XL-SF-001, XL-SF-002, XL-CF-001, TX-FC-011 |
 | | terminates an ongoing reception | RX-SF-012, RX-SF-013, RX-SF-014 |
 | | alloc_skb() failure | *n/c* |
