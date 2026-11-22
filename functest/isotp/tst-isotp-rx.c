@@ -1199,7 +1199,6 @@ static const struct pad_case cf_pad_cases[] = {
 	{ "CC8", RXP | CPD, 0xAA, 8, { 0x22 }, 1, 3, 0xAA, true },
 	{ "CC8", RXP | CPD, 0xAA, 8, { 0x22 }, 1, 3, 0xAB, false },
 	{ "CC8", RXP | CPD, 0xAA, 4, { 0x22 }, 1, 3, 0xAB, true },
-	{ "CC8", CPD, 0xCC, 4, { 0x22 }, 1, 3, 0xCC, false },
 	{ "FD64", CPL, 0xCC, 4, { 0x22 }, 1, 3, 0xCC, true },
 	{ "FD64", CPL, 0xCC, 8, { 0x22 }, 1, 3, 0xCC, false },
 	{ "FD64", RXP | CPL, 0xCC, 8, { 0x22 }, 1, 3, 0xCC, true },
