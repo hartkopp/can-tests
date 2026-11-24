@@ -152,6 +152,8 @@ struct can_isotp_xl_options {
 				/* at reception time (incoming)		*/
 
 	__u8	sdt_mode;	/* CAN CiA 611-1 SDT select (06/07/09)	*/
+
+	__u8	__res[3];	/* reserved, must be zero		*/
 };
 
 /* CAN CiA 611-1 Service Data Unit Types for ISO 15765-2 or CC/FD tunneling */
