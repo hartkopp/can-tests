@@ -6,6 +6,7 @@
  *
  */
 #include <stdbool.h>
+#include <stdio.h>
 #include <linux/can.h>
 #include <linux/can/isotp.h>
 
@@ -18,18 +19,31 @@ struct isotp_testcase {
 };
 
 struct isotp_testcase_description {
-	unsigned mtu;
+	unsigned mtu;	/* N_PDU: CAN_MTU (CC), CANFD_MTU (FD), CANXL_MTU (XL) */
+	unsigned sdt;	/* 0: no CAN XL encapsulation, else CiA 611-1 SDT */
 	unsigned tx_dl;
 	unsigned blocksize;
-	bool check_opt;
+	bool check_opt;	/* RX_PADDING only (no padding check) */
+	bool check_len;	/* CHK_PAD_LEN without RX_PADDING (optimized length) */
 	bool check_pad;
 	bool extaddr;
 	bool brs;
 	bool sec;
 	bool rrs;
 	bool vcid;
-	bool xltun; /* use SDT 6/7 for CAN CC/FD */
 };
+
+/*
+ * Supported combinations of mtu (N_PDU type) and sdt (CAN XL encapsulation):
+ *
+ * CAN_MTU   : sdt 0 (CAN CC), CAN_CIA_CC_TUNNEL_SDT (6) or
+ *             CAN_CIA_ISO15765_2_SDT (9) with tx_dl 8
+ * CANFD_MTU : sdt 0 (CAN FD), CAN_CIA_FD_TUNNEL_SDT (7) or
+ *             CAN_CIA_ISO15765_2_SDT (9) with a CAN FD tx_dl
+ * CANXL_MTU : CAN_CIA_ISO15765_2_SDT (9) with tx_dl > 8
+ *
+ * New test cases are appended to keep the existing test case numbers.
+ */
 
 const struct isotp_testcase_description tcd [] = {
 	{ /* CC 8 */
@@ -38,7 +52,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_opt = false,
 		.check_pad = false,
 		.extaddr = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CAN_MTU,
@@ -46,7 +59,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_opt = true,
 		.check_pad = false,
 		.extaddr = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CAN_MTU,
@@ -55,7 +67,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_opt = true,
 		.check_pad = true,
 		.extaddr = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CAN_MTU,
@@ -63,7 +74,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_opt = false,
 		.check_pad = false,
 		.extaddr = true,
-		.xltun = false,
 	},
 	{
 		.mtu = CAN_MTU,
@@ -71,7 +81,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_opt = true,
 		.check_pad = false,
 		.extaddr = true,
-		.xltun = false,
 	},
 	{
 		.mtu = CAN_MTU,
@@ -79,7 +88,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_opt = true,
 		.check_pad = true,
 		.extaddr = true,
-		.xltun = false,
 	},
 	{ /* FD 8 */
 		.mtu = CANFD_MTU,
@@ -88,7 +96,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = false,
 		.brs = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -97,7 +104,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = false,
 		.brs = true,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -106,7 +112,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = true,
 		.extaddr = false,
 		.brs = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -115,7 +120,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = true,
 		.brs = true,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -124,7 +128,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = true,
 		.brs = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -133,7 +136,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = true,
 		.extaddr = true,
 		.brs = true,
-		.xltun = false,
 	},
 	{ /* FD 12 */
 		.mtu = CANFD_MTU,
@@ -143,7 +145,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = false,
 		.brs = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -152,7 +153,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = false,
 		.brs = true,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -161,7 +161,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = true,
 		.extaddr = false,
 		.brs = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -170,7 +169,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = true,
 		.brs = true,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -179,7 +177,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = true,
 		.brs = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -188,7 +185,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = true,
 		.extaddr = true,
 		.brs = true,
-		.xltun = false,
 	},
 	{ /* FD 16 */
 		.mtu = CANFD_MTU,
@@ -197,7 +193,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = false,
 		.brs = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -206,7 +201,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = false,
 		.brs = true,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -215,7 +209,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = true,
 		.extaddr = false,
 		.brs = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -224,7 +217,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = true,
 		.brs = true,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -233,7 +225,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = true,
 		.brs = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -242,7 +233,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = true,
 		.extaddr = true,
 		.brs = true,
-		.xltun = false,
 	},
 	{ /* FD 64 */
 		.mtu = CANFD_MTU,
@@ -251,7 +241,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = false,
 		.brs = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -260,7 +249,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = false,
 		.brs = true,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -269,7 +257,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = true,
 		.extaddr = false,
 		.brs = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -279,7 +266,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = true,
 		.brs = true,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -288,7 +274,6 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = false,
 		.extaddr = true,
 		.brs = false,
-		.xltun = false,
 	},
 	{
 		.mtu = CANFD_MTU,
@@ -297,277 +282,277 @@ const struct isotp_testcase_description tcd [] = {
 		.check_pad = true,
 		.extaddr = true,
 		.brs = true,
-		.xltun = false,
 	},
-	{ /* CC 8 */
+	{ /* CC 8 in SDT 6 */
 		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_CC_TUNNEL_SDT,
 		.tx_dl = 8,
 		.check_opt = false,
 		.check_pad = false,
 		.extaddr = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_CC_TUNNEL_SDT,
 		.tx_dl = 8,
 		.check_opt = true,
 		.check_pad = false,
 		.extaddr = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_CC_TUNNEL_SDT,
 		.tx_dl = 8,
 		.blocksize = 9,
 		.check_opt = true,
 		.check_pad = true,
 		.extaddr = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_CC_TUNNEL_SDT,
 		.tx_dl = 8,
 		.check_opt = false,
 		.check_pad = false,
 		.extaddr = true,
-		.xltun = true,
 	},
 	{
 		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_CC_TUNNEL_SDT,
 		.tx_dl = 8,
 		.check_opt = true,
 		.check_pad = false,
 		.extaddr = true,
-		.xltun = true,
 	},
 	{
 		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_CC_TUNNEL_SDT,
 		.tx_dl = 8,
 		.check_opt = true,
 		.check_pad = true,
 		.extaddr = true,
-		.xltun = true,
 	},
-	{ /* FD 8 */
+	{ /* FD 8 in SDT 7 */
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 8,
 		.check_opt = false,
 		.check_pad = false,
 		.extaddr = false,
 		.brs = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 8,
 		.check_opt = true,
 		.check_pad = false,
 		.extaddr = false,
 		.brs = true,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 8,
 		.check_opt = true,
 		.check_pad = true,
 		.extaddr = false,
 		.brs = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 8,
 		.check_opt = false,
 		.check_pad = false,
 		.extaddr = true,
 		.brs = true,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 8,
 		.check_opt = true,
 		.check_pad = false,
 		.extaddr = true,
 		.brs = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 8,
 		.check_opt = true,
 		.check_pad = true,
 		.extaddr = true,
 		.brs = true,
-		.xltun = true,
 	},
-	{ /* FD 12 */
+	{ /* FD 12 in SDT 7 */
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 12,
 		.blocksize = 9,
 		.check_opt = false,
 		.check_pad = false,
 		.extaddr = false,
 		.brs = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 12,
 		.check_opt = true,
 		.check_pad = false,
 		.extaddr = false,
 		.brs = true,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 12,
 		.check_opt = true,
 		.check_pad = true,
 		.extaddr = false,
 		.brs = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 12,
 		.check_opt = false,
 		.check_pad = false,
 		.extaddr = true,
 		.brs = true,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 12,
 		.check_opt = true,
 		.check_pad = false,
 		.extaddr = true,
 		.brs = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 12,
 		.check_opt = true,
 		.check_pad = true,
 		.extaddr = true,
 		.brs = true,
-		.xltun = true,
 	},
-	{ /* FD 16 */
+	{ /* FD 16 in SDT 7 */
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 16,
 		.check_opt = false,
 		.check_pad = false,
 		.extaddr = false,
 		.brs = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 16,
 		.check_opt = true,
 		.check_pad = false,
 		.extaddr = false,
 		.brs = true,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 16,
 		.check_opt = true,
 		.check_pad = true,
 		.extaddr = false,
 		.brs = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 16,
 		.check_opt = false,
 		.check_pad = false,
 		.extaddr = true,
 		.brs = true,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 16,
 		.check_opt = true,
 		.check_pad = false,
 		.extaddr = true,
 		.brs = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 16,
 		.check_opt = true,
 		.check_pad = true,
 		.extaddr = true,
 		.brs = true,
-		.xltun = true,
 	},
-	{ /* FD 64 */
+	{ /* FD 64 in SDT 7 */
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 64,
 		.check_opt = false,
 		.check_pad = false,
 		.extaddr = false,
 		.brs = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 64,
 		.check_opt = true,
 		.check_pad = false,
 		.extaddr = false,
 		.brs = true,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 64,
 		.check_opt = true,
 		.check_pad = true,
 		.extaddr = false,
 		.brs = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 64,
 		.blocksize = 9,
 		.check_opt = false,
 		.check_pad = false,
 		.extaddr = true,
 		.brs = true,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 64,
 		.check_opt = true,
 		.check_pad = false,
 		.extaddr = true,
 		.brs = false,
-		.xltun = true,
 	},
 	{
 		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
 		.tx_dl = 64,
 		.check_opt = true,
 		.check_pad = true,
 		.extaddr = true,
 		.brs = true,
-		.xltun = true,
 	},
-	{ /* XL 8 */
-		.mtu = CANXL_MTU,
+	{ /* CC 8 in SDT 9 */
+		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 8,
 		.check_opt = false,
 		.check_pad = false,
@@ -577,7 +562,8 @@ const struct isotp_testcase_description tcd [] = {
 		.vcid = false,
 	},
 	{
-		.mtu = CANXL_MTU,
+		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 8,
 		.check_opt = true,
 		.check_pad = false,
@@ -587,7 +573,8 @@ const struct isotp_testcase_description tcd [] = {
 		.vcid = false,
 	},
 	{
-		.mtu = CANXL_MTU,
+		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 8,
 		.blocksize = 9,
 		.check_opt = true,
@@ -598,7 +585,8 @@ const struct isotp_testcase_description tcd [] = {
 		.vcid = false,
 	},
 	{
-		.mtu = CANXL_MTU,
+		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 8,
 		.check_opt = false,
 		.check_pad = false,
@@ -608,7 +596,8 @@ const struct isotp_testcase_description tcd [] = {
 		.vcid = false,
 	},
 	{
-		.mtu = CANXL_MTU,
+		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 8,
 		.check_opt = true,
 		.check_pad = false,
@@ -618,7 +607,8 @@ const struct isotp_testcase_description tcd [] = {
 		.vcid = true,
 	},
 	{
-		.mtu = CANXL_MTU,
+		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 8,
 		.check_opt = true,
 		.check_pad = true,
@@ -629,6 +619,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{ /* XL 9 */
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 9,
 		.extaddr = false,
 		.sec = false,
@@ -637,6 +628,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 9,
 		.extaddr = true,
 		.sec = false,
@@ -645,6 +637,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 9,
 		.extaddr = false,
 		.sec = true,
@@ -653,6 +646,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 9,
 		.extaddr = true,
 		.sec = true,
@@ -661,6 +655,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{ /* XL 16 */
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 16,
 		.extaddr = false,
 		.sec = false,
@@ -669,6 +664,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 16,
 		.extaddr = true,
 		.sec = false,
@@ -677,6 +673,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 16,
 		.extaddr = false,
 		.sec = true,
@@ -685,6 +682,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 16,
 		.extaddr = true,
 		.sec = true,
@@ -693,6 +691,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{ /* XL 20 pad */
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 20,
 		.check_opt = false,
 		.check_pad = false,
@@ -703,6 +702,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 20,
 		.check_opt = true,
 		.check_pad = false,
@@ -713,6 +713,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 20,
 		.check_opt = false,
 		.check_pad = false,
@@ -723,6 +724,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 20,
 		.check_opt = true,
 		.check_pad = false,
@@ -733,6 +735,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{ /* XL 64 */
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 64,
 		.extaddr = false,
 		.sec = false,
@@ -741,6 +744,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 64,
 		.extaddr = true,
 		.sec = false,
@@ -749,6 +753,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 64,
 		.extaddr = false,
 		.sec = true,
@@ -757,6 +762,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 64,
 		.extaddr = true,
 		.sec = true,
@@ -765,6 +771,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{ /* XL 256 */
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 256,
 		.extaddr = false,
 		.sec = false,
@@ -773,6 +780,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 256,
 		.blocksize = 9,
 		.extaddr = true,
@@ -782,6 +790,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 256,
 		.extaddr = false,
 		.sec = true,
@@ -790,6 +799,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 256,
 		.extaddr = true,
 		.sec = true,
@@ -798,6 +808,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{ /* XL 257 */
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 257,
 		.extaddr = false,
 		.sec = false,
@@ -806,6 +817,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 257,
 		.extaddr = true,
 		.sec = false,
@@ -814,6 +826,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 257,
 		.extaddr = false,
 		.sec = true,
@@ -822,6 +835,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 257,
 		.extaddr = true,
 		.sec = true,
@@ -830,6 +844,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{ /* XL 2047 */
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 2047,
 		.extaddr = false,
 		.sec = false,
@@ -838,6 +853,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 2047,
 		.blocksize = 9,
 		.extaddr = true,
@@ -847,6 +863,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 2047,
 		.blocksize = 1,
 		.extaddr = false,
@@ -856,6 +873,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 2047,
 		.blocksize = 2,
 		.extaddr = true,
@@ -865,6 +883,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{ /* XL 2048 */
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 2048,
 		.extaddr = false,
 		.sec = false,
@@ -873,6 +892,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 2048,
 		.extaddr = true,
 		.sec = false,
@@ -881,6 +901,7 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 2048,
 		.extaddr = false,
 		.sec = true,
@@ -889,15 +910,438 @@ const struct isotp_testcase_description tcd [] = {
 	},
 	{
 		.mtu = CANXL_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
 		.tx_dl = 2048,
 		.extaddr = true,
 		.sec = true,
 		.rrs = true,
 		.vcid = true,
+	},
+	{ /* FD 8 in SDT 9 */
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 8,
+		.check_opt = false,
+		.check_pad = false,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 8,
+		.check_opt = true,
+		.check_pad = false,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 8,
+		.check_opt = true,
+		.check_pad = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 8,
+		.check_opt = false,
+		.check_pad = false,
+		.extaddr = true,
+		.vcid = true,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 8,
+		.check_opt = true,
+		.check_pad = false,
+		.extaddr = true,
+		.vcid = true,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 8,
+		.check_opt = true,
+		.check_pad = true,
+		.extaddr = true,
+		.vcid = true,
+	},
+	{ /* FD 12 in SDT 9 */
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 12,
+		.blocksize = 9,
+		.check_opt = false,
+		.check_pad = false,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 12,
+		.check_opt = true,
+		.check_pad = false,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 12,
+		.check_opt = true,
+		.check_pad = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 12,
+		.check_opt = false,
+		.check_pad = false,
+		.extaddr = true,
+		.vcid = true,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 12,
+		.check_opt = true,
+		.check_pad = false,
+		.extaddr = true,
+		.vcid = true,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 12,
+		.check_opt = true,
+		.check_pad = true,
+		.extaddr = true,
+		.vcid = true,
+	},
+	{ /* FD 16 in SDT 9 */
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 16,
+		.check_opt = false,
+		.check_pad = false,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 16,
+		.check_opt = true,
+		.check_pad = false,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 16,
+		.check_opt = true,
+		.check_pad = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 16,
+		.check_opt = false,
+		.check_pad = false,
+		.extaddr = true,
+		.vcid = true,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 16,
+		.check_opt = true,
+		.check_pad = false,
+		.extaddr = true,
+		.vcid = true,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 16,
+		.check_opt = true,
+		.check_pad = true,
+		.extaddr = true,
+		.vcid = true,
+	},
+	{ /* FD 64 in SDT 9 */
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 64,
+		.check_opt = false,
+		.check_pad = false,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 64,
+		.check_opt = true,
+		.check_pad = false,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 64,
+		.check_opt = true,
+		.check_pad = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 64,
+		.blocksize = 9,
+		.check_opt = false,
+		.check_pad = false,
+		.extaddr = true,
+		.vcid = true,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 64,
+		.check_opt = true,
+		.check_pad = false,
+		.extaddr = true,
+		.vcid = true,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 64,
+		.check_opt = true,
+		.check_pad = true,
+		.extaddr = true,
+		.vcid = true,
+	},
+	{ /* CC 8 optimized length */
+		.mtu = CAN_MTU,
+		.tx_dl = 8,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CAN_MTU,
+		.tx_dl = 8,
+		.check_len = true,
+		.extaddr = true,
+	},
+	{ /* CC 8 in SDT 6 optimized length */
+		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_CC_TUNNEL_SDT,
+		.tx_dl = 8,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_CC_TUNNEL_SDT,
+		.tx_dl = 8,
+		.check_len = true,
+		.extaddr = true,
+	},
+	{ /* CC 8 in SDT 9 optimized length */
+		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 8,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CAN_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 8,
+		.check_len = true,
+		.extaddr = true,
+	},
+	{ /* FD 8 optimized length */
+		.mtu = CANFD_MTU,
+		.tx_dl = 8,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.tx_dl = 8,
+		.check_len = true,
+		.extaddr = true,
+	},
+	{ /* FD 12 optimized length */
+		.mtu = CANFD_MTU,
+		.tx_dl = 12,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.tx_dl = 12,
+		.check_len = true,
+		.extaddr = true,
+	},
+	{ /* FD 16 optimized length */
+		.mtu = CANFD_MTU,
+		.tx_dl = 16,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.tx_dl = 16,
+		.check_len = true,
+		.extaddr = true,
+	},
+	{ /* FD 64 optimized length */
+		.mtu = CANFD_MTU,
+		.tx_dl = 64,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.tx_dl = 64,
+		.check_len = true,
+		.extaddr = true,
+	},
+	{ /* FD 8 in SDT 7 optimized length */
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
+		.tx_dl = 8,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
+		.tx_dl = 8,
+		.check_len = true,
+		.extaddr = true,
+	},
+	{ /* FD 12 in SDT 7 optimized length */
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
+		.tx_dl = 12,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
+		.tx_dl = 12,
+		.check_len = true,
+		.extaddr = true,
+	},
+	{ /* FD 16 in SDT 7 optimized length */
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
+		.tx_dl = 16,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
+		.tx_dl = 16,
+		.check_len = true,
+		.extaddr = true,
+	},
+	{ /* FD 64 in SDT 7 optimized length */
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
+		.tx_dl = 64,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_FD_TUNNEL_SDT,
+		.tx_dl = 64,
+		.check_len = true,
+		.extaddr = true,
+	},
+	{ /* FD 8 in SDT 9 optimized length */
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 8,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 8,
+		.check_len = true,
+		.extaddr = true,
+	},
+	{ /* FD 12 in SDT 9 optimized length */
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 12,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 12,
+		.check_len = true,
+		.extaddr = true,
+	},
+	{ /* FD 16 in SDT 9 optimized length */
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 16,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 16,
+		.check_len = true,
+		.extaddr = true,
+	},
+	{ /* FD 64 in SDT 9 optimized length */
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 64,
+		.check_len = true,
+		.extaddr = false,
+	},
+	{
+		.mtu = CANFD_MTU,
+		.sdt = CAN_CIA_ISO15765_2_SDT,
+		.tx_dl = 64,
+		.check_len = true,
+		.extaddr = true,
 	},
 };
 
 #define MAXTCD (sizeof(tcd) / sizeof((tcd)[0]))
+
+/* print the CAN XL SDT (if any) and the N_PDU type, e.g. 'CC' or '9FD' */
+static inline void print_tcd_type(const struct isotp_testcase_description *t)
+{
+	const char *npdu = "CC";
+
+	if (t->mtu == CANFD_MTU)
+		npdu = "FD";
+	else if (t->mtu == CANXL_MTU)
+		npdu = "XL";
+
+	if (t->sdt)
+		printf("%X", t->sdt);
+
+	printf("%s", npdu);
+}
 
 #define MAXTESTLEN 15
 

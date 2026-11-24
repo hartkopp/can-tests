@@ -50,9 +50,13 @@ static void fill_tt_client(struct isotp_testcase *tt,
 	if (tcd->blocksize)
 		tt->fcopts.bs = tcd->blocksize & 0xF;
 
-	/* check for optimized PDU */
+	/* rx padding value without padding checks (no effect) */
 	if (tcd->check_opt)
 		tt->opts.flags |= CAN_ISOTP_RX_PADDING;
+
+	/* check for optimized frame length (CHK_PAD_LEN without RX_PADDING) */
+	if (tcd->check_len)
+		tt->opts.flags |= CAN_ISOTP_CHK_PAD_LEN;
 
 	/* padding */
 	if (tcd->check_pad) {
@@ -89,17 +93,10 @@ static void fill_tt_client(struct isotp_testcase *tt,
 			tt->llopts.tx_flags |= CANFD_BRS;
 	}
 
-	if (tcd->mtu == CANXL_MTU || tcd->xltun) {
+	/* CAN XL encapsulation (SDT 6/7: CC/FD tunneling, SDT 9: CC/FD/XL) */
+	if (tcd->sdt) {
 		tt->xlopts.tx_dl = tcd->tx_dl;
-
-		tt->xlopts.sdt_mode = CAN_CIA_ISO15765_2_SDT;
-
-		/* CC/FD tunneling */
-		if (tcd->mtu == CAN_MTU)
-			tt->xlopts.sdt_mode = CAN_CIA_CC_TUNNEL_SDT;
-
-		if (tcd->mtu == CANFD_MTU)
-			tt->xlopts.sdt_mode = CAN_CIA_FD_TUNNEL_SDT;
+		tt->xlopts.sdt_mode = tcd->sdt;
 
 		tt->xlopts.tx_flags |= CANXL_XLF;
 		if (tcd->sec)
@@ -259,9 +256,13 @@ int main(int argc, char **argv)
 			if (verbose) {
 				printf("---\nTestcase %02d Lencase %02d ", t, d);
 				printf("%s ", (tcd[t].check_opt)?"CHKOPT":"------");
+				printf("%s ", (tcd[t].check_len)?"CHKLEN":"------");
 				printf("%s ", (tcd[t].check_pad)?"CHKPAD":"------");
 				printf("%s ", (tcd[t].extaddr)?"EXTADDR":"-------");
-				printf("%s ", (tcd[t].xltun)?"XLTUN":"-----");
+				if (tcd[t].sdt)
+					printf("SDT%X ", tcd[t].sdt);
+				else
+					printf("---- ");
 				printf("%s ", (tcd[t].brs)?"BRS":"---");
 				printf("%s ", (tcd[t].sec)?"SEC":"---");
 				printf("%s ", (tcd[t].rrs)?"RRS":"---");
@@ -297,19 +298,6 @@ int main(int argc, char **argv)
 					perror("XL link layer sockopt");
 					exit(1);
 				}
-				switch (tt.xlopts.sdt_mode) {
-				case CAN_CIA_ISO15765_2_SDT:
-					printf("XL");
-					break;
-				case CAN_CIA_CC_TUNNEL_SDT:
-					printf("XC");
-					break;
-				case CAN_CIA_FD_TUNNEL_SDT:
-					printf("XF");
-					break;
-				default:
-					printf("--");
-				}
 			}
 			if (tt.llopts.tx_dl) {
 				if (setsockopt(s, SOL_CAN_ISOTP, CAN_ISOTP_LL_OPTS,
@@ -317,9 +305,8 @@ int main(int argc, char **argv)
 					perror("link layer sockopt");
 					exit(1);
 				}
-				if ((tcd->xltun == false) && (!(tt.xlopts.tx_flags & CANXL_XLF)))
-					printf("%s", (tt.llopts.mtu == CANFD_MTU)?"FD":"CC");
 			}
+			print_tcd_type(&tcd[t]);
 
 			addr.can_family = AF_CAN;
 			addr.can_addr.tp.tx_id = tt.addr.can_addr.tp.tx_id;
