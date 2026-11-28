@@ -631,8 +631,9 @@ Parameterized test cases with the same behaviour are grouped.
 
 **invalid SF during reception**
 
-- **Behaviour:** An invalid SF (SF_DL 0 or SF_DL > CAN_DL - 1) received during a segmented reception is ignored: the reception continues and the PDU is completed by the remaining CFs.
-- **Code:** protocolrx.c:isotp_rcv_sf() SF_DL check before terminating the reception
+- **Behaviour:** An invalid SF (SF_DL 0 or SF_DL > CAN_DL - 1) received during a segmented reception creates no PDU, no FC and no error.
+- **Code:** protocolrx.c:isotp_rcv_sf() SF_DL check
+- **ISO 15765-2:** NOTE: whether the ongoing reception is continued or terminated is not checked.
 
 ### RX-SF-014
 
@@ -708,8 +709,9 @@ Parameterized test cases with the same behaviour are grouped.
 
 **invalid FF during reception**
 
-- **Behaviour:** An invalid FF (CAN_DL < 8, FF_DL < FF_DLmin, unneeded 32 bit FF_DL escape) received during a reception is ignored: LL_DL and FF_DL of the ongoing reception are kept and the PDU is completed by the remaining CFs.
-- **Code:** protocolrx.c:isotp_rcv_ff() checks before terminating the reception
+- **Behaviour:** An invalid FF (CAN_DL < 8, FF_DL < FF_DLmin, unneeded 32 bit FF_DL escape) received during a reception creates no FC, no PDU and no error.
+- **Code:** protocolrx.c:isotp_rcv_ff() FF checks
+- **ISO 15765-2:** NOTE: whether the ongoing reception is continued or terminated is not checked.
 
 ### RX-FF-009
 

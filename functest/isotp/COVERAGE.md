@@ -40,7 +40,7 @@ paths that are not reachable with virtual CAN interfaces.
 | | CAN XL N_PDUs: enabled padding checks with CC/FD rules | XL-SF-002, TX-FC-011 |
 | | CAN XL N_PDUs: data presence only (no exact SF / last CF / FC length) | XL-SF-001, XL-SF-002, XL-CF-001, TX-FC-011 |
 | | valid SF terminates an ongoing reception | RX-SF-012, RX-SF-014 |
-| | invalid SF is ignored (reception continues) | RX-SF-013 |
+| | invalid SF: no PDU, no FC (ongoing reception not checked) | RX-SF-013 |
 | | alloc_skb() failure | *n/c* |
 | `isotp_rcv_ff()` | CAN_DL < 8 | RX-FF-001, RX-FF-008 |
 | | CAN FD: CAN_DL is no DLC length | RX-FF-002, XL-SDT7-001 |
@@ -54,7 +54,7 @@ paths that are not reachable with virtual CAN interfaces.
 | | LISTEN_MODE: no FC | RX-FF-010-*, RX-MF-002, E2E-SNIFF-*, E2E-MC-* |
 | | sender LL_DL from FF | RX-LL-001..004, E2E-MIX-* |
 | | valid FF during reception (restart) | RX-FF-007 |
-| | invalid FF is ignored (reception continues) | RX-FF-008 |
+| | invalid FF: no FC, no PDU (ongoing reception not checked) | RX-FF-008 |
 | `isotp_rcv_cf()` | CAN_DL > LL_DL | RX-FF-002 |
 | | CAN_DL < LL_DL for a non-last CF | RX-CF-003, RX-CF-004 |
 | | short last CF lacking bytes / CF with N_PCI only | RX-CF-014, RX-CF-015 |

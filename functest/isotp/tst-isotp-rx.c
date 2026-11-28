@@ -598,14 +598,12 @@ static void rx_sf_during_rx(struct ft_ctx *ctx, const void *param)
 	ft_peer_tx(ctx, &env.p, &fr[1]);
 
 	if (invalid) {
-		/* invalid SF (SF_DL 0, SF_DL > CAN_DL - 1) is ignored */
+		/* invalid SF (SF_DL 0, SF_DL > CAN_DL - 1): no PDU, no FC
+		 * (the state of the ongoing reception is not checked)
+		 */
 		rx_tx(ctx, 4, 4, 0x00, 0x61, 0x62, 0x63);
 		rx_tx(ctx, 4, 4, 0x05, 0x61, 0x62, 0x63);
 		ft_dut_expect_nopdu(ctx, env.s, 20);
-
-		/* the reception continues */
-		rx_send_frames(ctx, fr, 2, n);
-		ft_dut_expect_pdu(ctx, env.s, pdu, sizeof(pdu), 200);
 		ft_peer_expect_none(ctx, &env.p, 10);
 		ft_dut_expect_noerr(ctx, env.s);
 		goto out;
@@ -908,18 +906,15 @@ static void rx_ff_invalid_during_rx(struct ft_ctx *ctx, const void *param)
 		goto out;
 	ft_peer_tx(ctx, &env.p, &fr[1]);
 
-	/* invalid FFs are ignored: CAN_DL 7, FF_DL 7 (< FF_DLmin) and an
-	 * unneeded 32 bit FF_DL escape sequence
+	/* invalid FFs (CAN_DL 7, FF_DL 7 < FF_DLmin and an unneeded 32 bit
+	 * FF_DL escape sequence): no FC, no PDU (the state of the ongoing
+	 * reception is not checked)
 	 */
 	rx_tx(ctx, 7, 7, 0x10, 0x14, 1, 2, 3, 4, 5);
 	rx_tx(ctx, 8, 8, 0x10, 0x07, 1, 2, 3, 4, 5, 6);
 	rx_tx(ctx, 8, 8, 0x10, 0x00, 0, 0, 0x01, 0x00, 1, 2);
 	ft_peer_expect_none(ctx, &env.p, 20);
-
-	/* the reception continues with the former LL_DL and FF_DL */
-	rx_send_frames(ctx, fr, 2, n);
-	ft_dut_expect_pdu(ctx, env.s, pdu, sizeof(pdu), 200);
-	ft_peer_expect_none(ctx, &env.p, 10);
+	ft_dut_expect_nopdu(ctx, env.s, 10);
 	ft_dut_expect_noerr(ctx, env.s);
 out:
 	free(fr);
@@ -1668,8 +1663,9 @@ static const struct ft_test tests[] = {
 	  "NOTE: ISO 15765-2 indicates the terminated reception with N_UNEXP_PDU. The socket API has no indication for a discarded PDU, the new PDU is delivered."),
 	T("RX-SF-013", "invalid SF during reception", 0, rx_sf_during_rx,
 	  "invalid",
-	  "An invalid SF (SF_DL 0 or SF_DL > CAN_DL - 1) received during a segmented reception is ignored: the reception continues and the PDU is completed by the remaining CFs.",
-	  "protocolrx.c:isotp_rcv_sf() SF_DL check before terminating the reception", NULL),
+	  "An invalid SF (SF_DL 0 or SF_DL > CAN_DL - 1) received during a segmented reception creates no PDU, no FC and no error.",
+	  "protocolrx.c:isotp_rcv_sf() SF_DL check",
+	  "NOTE: whether the ongoing reception is continued or terminated is not checked."),
 	T("RX-SF-014", "no N_Cr timeout after terminated reception", FT_SLOW,
 	  rx_sf_during_rx, "slow",
 	  "After the reception was terminated by a SF no N_Cr timeout error is reported.",
@@ -1725,8 +1721,9 @@ static const struct ft_test tests[] = {
 	  "NOTE: ISO 15765-2 indicates the terminated reception with N_UNEXP_PDU. The socket API has no indication for a discarded PDU, the new PDU is received."),
 	T("RX-FF-008", "invalid FF during reception", 0,
 	  rx_ff_invalid_during_rx, NULL,
-	  "An invalid FF (CAN_DL < 8, FF_DL < FF_DLmin, unneeded 32 bit FF_DL escape) received during a reception is ignored: LL_DL and FF_DL of the ongoing reception are kept and the PDU is completed by the remaining CFs.",
-	  "protocolrx.c:isotp_rcv_ff() checks before terminating the reception", NULL),
+	  "An invalid FF (CAN_DL < 8, FF_DL < FF_DLmin, unneeded 32 bit FF_DL escape) received during a reception creates no FC, no PDU and no error.",
+	  "protocolrx.c:isotp_rcv_ff() FF checks",
+	  "NOTE: whether the ongoing reception is continued or terminated is not checked."),
 	T("RX-FF-009", "FC content from RECV_FC", 0, rx_ff_fc_content, NULL,
 	  "The FC.CTS contains BS and STmin from CAN_ISOTP_RECV_FC (reserved STmin values are rejected by the socket option).",
 	  "protocoltx.c:isotp_send_fc(), isotp.c:isotp_setsockopt_locked()",
