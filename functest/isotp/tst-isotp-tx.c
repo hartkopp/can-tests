@@ -1188,7 +1188,7 @@ static const char seg_ref[] =
 #define SEG2(m) SEG(m, PLAIN), SEG(m, AE)
 
 static const char bc_seg_req[] =
-	"With CAN_ISOTP_CF_BROADCAST (FF N_PCI 0x1) or CAN_ISOTP_MF_BROADCAST (multicast FF N_PCI 0x4) all CFs are sent without waiting for FC frames (separation time = frame_txtime or CAN_ISOTP_TX_STMIN with FORCE_TXSTMIN). SFs are sent normally.";
+	"With CAN_ISOTP_CF_BROADCAST (FF N_PCI 0x1) or CAN_ISOTP_MF_BROADCAST (multicast FF N_PCI 0x4) all CFs are sent without waiting for FC frames (separation time = frame_txtime, plus the CAN_ISOTP_TX_STMIN socket option value with the FORCE_TXSTMIN flag). SFs are sent normally.";
 
 #define BCSEG(m, f, fn)							\
 	T("TX-BC-" #fn "-" m, #fn " broadcast segmentation " m, 0,	\

@@ -558,7 +558,7 @@ static const char stm_ref[] =
 	  stm_ref, NULL)
 
 static const char bc_req[] =
-	"In CF/MF broadcast mode (no FC) the gap between all frames is frame_txtime, or CAN_ISOTP_TX_STMIN with FORCE_TXSTMIN (without frame_txtime).";
+	"In CF/MF broadcast mode (no FC) the gap between all frames is frame_txtime, plus the value of the CAN_ISOTP_TX_STMIN socket option when the FORCE_TXSTMIN flag is set.";
 
 static const struct ft_test tests[] = {
 	STM("001", "burst (STmin 0, frame_txtime 0)", 0, -1, TXT_ZERO, -1, 20),
@@ -590,10 +590,10 @@ static const struct ft_test tests[] = {
 	  &((const struct stm_param){ 0, -1, 5 * MS, CAN_ISOTP_CF_BROADCAST,
 				      5 * MS, 6 }),
 	  bc_req, "protocoltx.c:isotp_sendmsg() tx_gap", NULL),
-	T("TIM-BC-002", "CF broadcast gap (FORCE_TXSTMIN 10 ms)", FT_TIMING,
-	  tim_stmin,
+	T("TIM-BC-002", "CF broadcast gap (FORCE_TXSTMIN 10 ms + frame_txtime 50 ms)",
+	  FT_TIMING, tim_stmin,
 	  &((const struct stm_param){ 0, 10 * MS, 50 * MS,
-				      CAN_ISOTP_CF_BROADCAST, 10 * MS, 6 }),
+				      CAN_ISOTP_CF_BROADCAST, 60 * MS, 6 }),
 	  bc_req, "protocoltx.c:isotp_sendmsg() tx_gap", NULL),
 	T("TIM-BC-003", "MF broadcast gap (default frame_txtime)", FT_TIMING,
 	  tim_stmin,

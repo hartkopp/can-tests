@@ -81,7 +81,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **CAN_ISOTP_OPTS: frame_txtime**
 
-- **Behaviour:** frame_txtime (N_As/N_Ar) is limited to 100 ms (else EINVAL, options unchanged). 0xFFFFFFFF (CAN_ISOTP_FRAME_TXTIME_ZERO) selects 0 ns, 0 keeps the current internal value. getsockopt() returns the struct as given by the last successful setsockopt() (incl. 0 / ZERO).
+- **Behaviour:** frame_txtime (N_As/N_Ar) is limited to the N_As/N_Ar timeout of 1 s (else EINVAL, options unchanged). 0xFFFFFFFF (CAN_ISOTP_FRAME_TXTIME_ZERO) selects 0 ns, 0 keeps the current internal value. getsockopt() returns the struct as given by the last successful setsockopt() (incl. 0 / ZERO).
 - **Code:** isotp.c:isotp_setsockopt_locked()
 
 ### API-OPT-006
@@ -423,7 +423,7 @@ Parameterized test cases with the same behaviour are grouped.
 **CF broadcast segmentation CC8**
 
 - **Variants:** `TX-BC-CF-CC8`, `TX-BC-CF-FD64`, `TX-BC-CF-XL9-2048`, `TX-BC-MF-CC8`, `TX-BC-MF-FD64`, `TX-BC-MF-XL9-2048`
-- **Behaviour:** With CAN_ISOTP_CF_BROADCAST (FF N_PCI 0x1) or CAN_ISOTP_MF_BROADCAST (multicast FF N_PCI 0x4) all CFs are sent without waiting for FC frames (separation time = frame_txtime or CAN_ISOTP_TX_STMIN with FORCE_TXSTMIN). SFs are sent normally.
+- **Behaviour:** With CAN_ISOTP_CF_BROADCAST (FF N_PCI 0x1) or CAN_ISOTP_MF_BROADCAST (multicast FF N_PCI 0x4) all CFs are sent without waiting for FC frames (separation time = frame_txtime, plus the CAN_ISOTP_TX_STMIN socket option value with the FORCE_TXSTMIN flag). SFs are sent normally.
 - **Code:** protocoltx.c:isotp_sendmsg() CF/MF broadcast, isotp_ff_pci()
 
 ### TX-BC-SF-CC8 .. TX-BC-SF-XL9-2048 (3 variants)
@@ -1140,7 +1140,7 @@ Parameterized test cases with the same behaviour are grouped.
 **CF broadcast gap (frame_txtime 5 ms)**
 
 - **Variants:** `TIM-BC-001`, `TIM-BC-002`, `TIM-BC-003`
-- **Behaviour:** In CF/MF broadcast mode (no FC) the gap between all frames is frame_txtime, or CAN_ISOTP_TX_STMIN with FORCE_TXSTMIN (without frame_txtime).
+- **Behaviour:** In CF/MF broadcast mode (no FC) the gap between all frames is frame_txtime, plus the value of the CAN_ISOTP_TX_STMIN socket option when the FORCE_TXSTMIN flag is set.
 - **Code:** protocoltx.c:isotp_sendmsg() tx_gap
 - **Flags:** timing
 

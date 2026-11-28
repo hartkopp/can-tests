@@ -186,7 +186,7 @@ paths that are not reachable with virtual CAN interfaces.
 | `isotp_getname()` | peer => EOPNOTSUPP, local address | API-SOCK-002, API-SOCK-004 |
 | `isotp_setsockopt_locked()` | bound => EISCONN | API-OPT-012 |
 | | transfer still active (EAGAIN) | *n/c* (needs NETDEV_UNREGISTER) |
-| | CAN_ISOTP_OPTS checks / rx_ext_address / frame_txtime / padding check flags | API-OPT-004..007, API-OPT-013, TIM-STM-016..019 |
+| | CAN_ISOTP_OPTS checks / rx_ext_address / frame_txtime / padding check flags | API-OPT-004..006, API-OPT-013, TIM-STM-016..019 |
 | | CAN_ISOTP_RECV_FC (reserved STmin rejected) | API-OPT-008, RX-FF-009 |
 | | CAN_ISOTP_TX_STMIN / RX_STMIN | API-OPT-009, TIM-STM-013..015, RX-CF-009 |
 | | CAN_ISOTP_LL_OPTS checks (CAN FD tx_flags: BRS/FDF only) | API-OPT-010, TX-FL-001 |

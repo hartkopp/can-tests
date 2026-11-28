@@ -2022,7 +2022,7 @@ static const struct ft_test tests[] = {
 	  "Only one of CAN_ISOTP_SF_BROADCAST, CAN_ISOTP_CF_BROADCAST and CAN_ISOTP_MF_BROADCAST may be set (else EINVAL). A rejected CAN_ISOTP_OPTS call leaves all options unchanged.",
 	  "isotp.c:isotp_setsockopt_locked() hweight32(ISOTP_ALL_BC_FLAGS)", NULL),
 	T("API-OPT-005", "CAN_ISOTP_OPTS: frame_txtime", 0, api_opt_txtime,
-	  "frame_txtime (N_As/N_Ar) is limited to 100 ms (else EINVAL, options unchanged). 0xFFFFFFFF (CAN_ISOTP_FRAME_TXTIME_ZERO) selects 0 ns, 0 keeps the current internal value. getsockopt() returns the struct as given by the last successful setsockopt() (incl. 0 / ZERO).",
+	  "frame_txtime (N_As/N_Ar) is limited to the N_As/N_Ar timeout of 1 s (else EINVAL, options unchanged). 0xFFFFFFFF (CAN_ISOTP_FRAME_TXTIME_ZERO) selects 0 ns, 0 keeps the current internal value. getsockopt() returns the struct as given by the last successful setsockopt() (incl. 0 / ZERO).",
 	  "isotp.c:isotp_setsockopt_locked()", NULL),
 	T("API-OPT-006", "CAN_ISOTP_OPTS: rx_ext_address", 0, api_opt_rxext,
 	  "Without CAN_ISOTP_RX_EXT_ADDR the rx_ext_address is set to ext_address (visible with getsockopt). With the flag both addresses are kept independently.",
