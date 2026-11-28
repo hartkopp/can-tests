@@ -116,7 +116,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **CAN_ISOTP_LL_OPTS validation**
 
-- **Behaviour:** LL mtu must be 16 (CAN_MTU) or 72 (CANFD_MTU). tx_dl must be a CAN FD DLC length (8,12,16,20,24,32,48,64); with mtu 16 only tx_dl 8 and tx_flags 0 are valid, with mtu 72 only the tx_flags CANFD_BRS and CANFD_FDF (CANFD_ESI and undefined bits are rejected). Rejected values leave the LL options unchanged (EINVAL).
+- **Behaviour:** LL mtu must be 16 (CAN_MTU) or 72 (CANFD_MTU). tx_dl must be a CAN FD DLC length (8,12,16,20,24,32,48,64); with mtu 16 only tx_dl 8 and tx_flags 0 are valid, with mtu 72 only the tx_flags CANFD_BRS and CANFD_FDF (CANFD_ESI and undefined bits are rejected). For mtu 72 CANFD_FDF is always added to the stored tx_flags (visible with getsockopt). Rejected values leave the LL options unchanged (EINVAL).
 - **Code:** isotp.c:isotp_setsockopt_locked() CAN_ISOTP_LL_OPTS
 
 ### API-OPT-011

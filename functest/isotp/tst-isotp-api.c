@@ -688,8 +688,11 @@ static void api_opt_ll(struct ft_ctx *ctx, const void *param)
 			ft_fail(ctx, "FD tx_dl %u: %s", v, ft_errname(r));
 			nerr++;
 		}
-		if (!r)
+		if (!r) {
 			last = ll;
+			/* CANFD_FDF is always added for CAN FD */
+			last.tx_flags |= CANFD_FDF;
+		}
 		len = sizeof(get);
 		get_opt(s, CAN_ISOTP_LL_OPTS, &get, &len);
 		if (memcmp(&get, &last, sizeof(get))) {
@@ -751,7 +754,8 @@ static void api_opt_ll(struct ft_ctx *ctx, const void *param)
 			continue;
 		len = sizeof(get);
 		get_opt(s, CAN_ISOTP_LL_OPTS, &get, &len);
-		if (get.tx_flags != v) {
+		/* CANFD_FDF is always added for CAN FD */
+		if (get.tx_flags != (v | CANFD_FDF)) {
 			ft_fail(ctx, "FD tx_flags %02X stored as %02X", v,
 				get.tx_flags);
 			if (++nerr > 5)
@@ -2039,7 +2043,7 @@ static const struct ft_test tests[] = {
 	  "CAN_ISOTP_TX_STMIN and CAN_ISOTP_RX_STMIN accept any u32 nanosecond value.",
 	  "isotp.c:isotp_setsockopt_locked()", NULL),
 	T("API-OPT-010", "CAN_ISOTP_LL_OPTS validation", 0, api_opt_ll,
-	  "LL mtu must be 16 (CAN_MTU) or 72 (CANFD_MTU). tx_dl must be a CAN FD DLC length (8,12,16,20,24,32,48,64); with mtu 16 only tx_dl 8 and tx_flags 0 are valid, with mtu 72 only the tx_flags CANFD_BRS and CANFD_FDF (CANFD_ESI and undefined bits are rejected). Rejected values leave the LL options unchanged (EINVAL).",
+	  "LL mtu must be 16 (CAN_MTU) or 72 (CANFD_MTU). tx_dl must be a CAN FD DLC length (8,12,16,20,24,32,48,64); with mtu 16 only tx_dl 8 and tx_flags 0 are valid, with mtu 72 only the tx_flags CANFD_BRS and CANFD_FDF (CANFD_ESI and undefined bits are rejected). For mtu 72 CANFD_FDF is always added to the stored tx_flags (visible with getsockopt). Rejected values leave the LL options unchanged (EINVAL).",
 	  "isotp.c:isotp_setsockopt_locked() CAN_ISOTP_LL_OPTS", NULL),
 	T("API-OPT-011", "CAN_ISOTP_XL_OPTS validation", 0, api_opt_xl,
 	  "XL mode is enabled with CANXL_XLF in tx_flags. Then tx_flags and rx_flags may only contain XLF|SEC|RRS (rx_flags must contain XLF), tx_dl must be 8..2048, tx_addr/rx_addr must be valid 11/29 bit CAN IDs and sdt_mode must be 6, 7 or 9 (else EINVAL, options unchanged). VCIDs are not checked. The reserved bytes (__res[3], struct size 20) must be zero, also when disabling the XL mode (else EINVAL); getsockopt() returns them as zero. Without XLF the call disables XL mode without further checks and only clears the stored tx_flags.",
