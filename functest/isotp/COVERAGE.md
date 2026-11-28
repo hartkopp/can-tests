@@ -17,7 +17,7 @@ paths that are not reachable with virtual CAN interfaces.
 | `chk_optimized_fail()` | CAN_DL <= 8 | TX-FC-011, RX-SF-011, RX-CF-008 |
 | | CAN_DL > 8 (next DLC length) | TX-FC-011 (FD), RX-SF-011 (FD) |
 | `chk_pad_fail()` | CHK_PAD_LEN without RX_PADDING | TX-FC-011, RX-SF-011, RX-CF-008 |
-| | CHK_PAD_DATA without RX_PADDING (always fail) | TX-FC-011, RX-SF-011, RX-CF-008 |
+| | CHK_PAD_DATA without RX_PADDING (ignored) | API-OPT-013, TX-FC-011, RX-SF-011, RX-CF-008 |
 | | RX_PADDING + CHK_PAD_LEN length fail | TX-FC-011, RX-SF-011, RX-CF-008, XL-SF-002 |
 | | RX_PADDING + CHK_PAD_DATA content fail | TX-FC-011, RX-SF-011, RX-CF-008 |
 | `isotp_rcv_fc()` | not waiting for FC (idle / sending CFs) | TX-FC-012, TX-FC-013 |

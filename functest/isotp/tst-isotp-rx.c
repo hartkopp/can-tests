@@ -485,6 +485,11 @@ static const struct pad_case sf_pad_cases[] = {
 	/* RX_PADDING only: no checks */
 	{ "CC8", RXP, 0x55, 4, { 0x03 }, 1, 3, 0xCC, true },
 	{ "CC8", RXP, 0x55, 8, { 0x03 }, 1, 3, 0xCC, true },
+	/* CHK_PAD_DATA without RX_PADDING is ignored */
+	{ "CC8", CPD, 0xAA, 4, { 0x03 }, 1, 3, 0xCC, true },
+	{ "CC8", CPD, 0xAA, 8, { 0x03 }, 1, 3, 0xCC, true },
+	{ "CC8", CPL | CPD, 0xAA, 4, { 0x03 }, 1, 3, 0xCC, true },
+	{ "CC8", CPL | CPD, 0xAA, 8, { 0x03 }, 1, 3, 0xCC, false },
 	/* CAN FD: CHK_PAD_LEN without RX_PADDING => next valid DLC length */
 	{ "FD64", CPL, 0xCC, 12, { 0x00, 10 }, 2, 10, 0xCC, true },
 	{ "FD64", CPL, 0xCC, 12, { 0x00, 9 }, 2, 9, 0xCC, true },
@@ -501,6 +506,8 @@ static const struct pad_case sf_pad_cases[] = {
 	/* CAN FD: RX_PADDING + CHK_PAD_DATA */
 	{ "FD64", RXP | CPD, 0xAA, 64, { 0x00, 7 }, 2, 7, 0xAA, true },
 	{ "FD64", RXP | CPD, 0xAA, 64, { 0x00, 7 }, 2, 7, 0xAB, false },
+	/* CAN FD: CHK_PAD_DATA without RX_PADDING is ignored */
+	{ "FD64", CPD, 0xAA, 64, { 0x00, 7 }, 2, 7, 0xCC, true },
 };
 
 static void rx_pad_cases(struct ft_ctx *ctx, const struct pad_case *cases,
@@ -1199,6 +1206,10 @@ static const struct pad_case cf_pad_cases[] = {
 	{ "CC8", RXP | CPD, 0xAA, 8, { 0x22 }, 1, 3, 0xAA, true },
 	{ "CC8", RXP | CPD, 0xAA, 8, { 0x22 }, 1, 3, 0xAB, false },
 	{ "CC8", RXP | CPD, 0xAA, 4, { 0x22 }, 1, 3, 0xAB, true },
+	{ "CC8", CPD, 0xCC, 4, { 0x22 }, 1, 3, 0xCC, true },
+	{ "CC8", CPD, 0xCC, 8, { 0x22 }, 1, 3, 0xAB, true },
+	{ "CC8", CPL | CPD, 0xCC, 4, { 0x22 }, 1, 3, 0xCC, true },
+	{ "CC8", CPL | CPD, 0xCC, 8, { 0x22 }, 1, 3, 0xCC, false },
 	{ "FD64", CPL, 0xCC, 4, { 0x22 }, 1, 3, 0xCC, true },
 	{ "FD64", CPL, 0xCC, 8, { 0x22 }, 1, 3, 0xCC, false },
 	{ "FD64", RXP | CPL, 0xCC, 8, { 0x22 }, 1, 3, 0xCC, true },
@@ -1649,7 +1660,7 @@ static const struct ft_test tests[] = {
 	  "Without padding checks CAN FD SFs with a CAN_DL that is no CAN FD DLC length (e.g. 9..11, only possible on virtual CAN) are accepted.",
 	  "protocolrx.c:isotp_rcv()", NULL),
 	T("RX-SF-011", "SF padding checks", 0, rx_sf_pad, NULL,
-	  "CHK_PAD_LEN without RX_PADDING requires the optimized length (CC: exact, FD: next DLC length after the data); RX_PADDING|CHK_PAD_LEN requires a valid CAN FD DLC length >= 8; RX_PADDING|CHK_PAD_DATA requires rxpad_content in all bytes after the data; CHK_PAD_DATA without RX_PADDING is rejected by CAN_ISOTP_OPTS (API-OPT-013). Failures are reported as EBADMSG and the PDU is dropped.",
+	  "CHK_PAD_LEN without RX_PADDING requires the optimized length (CC: exact, FD: next DLC length after the data); RX_PADDING|CHK_PAD_LEN requires a valid CAN FD DLC length >= 8; RX_PADDING|CHK_PAD_DATA requires rxpad_content in all bytes after the data; CHK_PAD_DATA without RX_PADDING is ignored (also together with CHK_PAD_LEN, then only the optimized length is checked). Failures are reported as EBADMSG and the PDU is dropped.",
 	  "protocolrx.c:isotp_rcv_sf(), chk_pad_fail(), chk_optimized_fail()", NULL),
 	T("RX-SF-012", "valid SF during reception", 0, rx_sf_during_rx, NULL,
 	  "A valid SF received during a segmented reception is delivered and terminates the reception silently (remaining CFs are ignored, no error).",
@@ -1769,7 +1780,7 @@ static const struct ft_test tests[] = {
 	  "The receiver sends a FC after every BS CFs (BS 1..255).",
 	  "protocolrx.c:isotp_rcv_cf() so->rxfc.bs", NULL),
 	T("RX-CF-008", "last CF padding checks", 0, rx_cf_pad, NULL,
-	  "The padding checks are applied to the last CF (rules as for SF); failures are reported with EBADMSG and the PDU is dropped.",
+	  "The padding checks are applied to the last CF (rules as for SF, CHK_PAD_DATA without RX_PADDING is ignored); failures are reported with EBADMSG and the PDU is dropped.",
 	  "protocolrx.c:isotp_rcv_cf() chk_pad_fail()", NULL),
 	T("RX-CF-009-CC8", "RX STmin enforcement CC8", 0, rx_cf_rxstmin,
 	  "CC8",

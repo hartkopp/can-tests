@@ -95,7 +95,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **CAN_ISOTP_OPTS: padding check flags**
 
-- **Behaviour:** CAN_ISOTP_CHK_PAD_DATA needs CAN_ISOTP_RX_PADDING (rxpad_content), else EINVAL and the options are unchanged (also together with CAN_ISOTP_CHK_PAD_LEN). CAN_ISOTP_CHK_PAD_LEN without RX_PADDING (optimized frame length check) is accepted.
+- **Behaviour:** All combinations of the padding check flags are accepted and stored, also CAN_ISOTP_CHK_PAD_DATA without CAN_ISOTP_RX_PADDING (ignored on reception) and CAN_ISOTP_CHK_PAD_LEN without RX_PADDING (optimized frame length check).
 - **Code:** isotp.c:isotp_setsockopt_locked() CAN_ISOTP_OPTS
 
 ### API-OPT-008
@@ -369,7 +369,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **FC padding checks**
 
-- **Behaviour:** With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING\|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING\|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING is rejected by CAN_ISOTP_OPTS (API-OPT-013). The checks also apply to FCs of CAN XL N_PDUs (e.g. RX_PADDING\|CHK_PAD_LEN rejects CAN_DL 100), without checks any CAN_DL is accepted. Failing FCs abort the transfer with EBADMSG.
+- **Behaviour:** With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING\|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING\|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING is ignored. The checks also apply to FCs of CAN XL N_PDUs (e.g. RX_PADDING\|CHK_PAD_LEN rejects CAN_DL 100), without checks any CAN_DL is accepted. Failing FCs abort the transfer with EBADMSG.
 - **Code:** protocolrx.c:isotp_rcv_fc(), chk_pad_fail(), chk_optimized_fail()
 
 ### TX-FC-012
@@ -616,7 +616,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **SF padding checks**
 
-- **Behaviour:** CHK_PAD_LEN without RX_PADDING requires the optimized length (CC: exact, FD: next DLC length after the data); RX_PADDING\|CHK_PAD_LEN requires a valid CAN FD DLC length >= 8; RX_PADDING\|CHK_PAD_DATA requires rxpad_content in all bytes after the data; CHK_PAD_DATA without RX_PADDING is rejected by CAN_ISOTP_OPTS (API-OPT-013). Failures are reported as EBADMSG and the PDU is dropped.
+- **Behaviour:** CHK_PAD_LEN without RX_PADDING requires the optimized length (CC: exact, FD: next DLC length after the data); RX_PADDING\|CHK_PAD_LEN requires a valid CAN FD DLC length >= 8; RX_PADDING\|CHK_PAD_DATA requires rxpad_content in all bytes after the data; CHK_PAD_DATA without RX_PADDING is ignored (also together with CHK_PAD_LEN, then only the optimized length is checked). Failures are reported as EBADMSG and the PDU is dropped.
 - **Code:** protocolrx.c:isotp_rcv_sf(), chk_pad_fail(), chk_optimized_fail()
 
 ### RX-SF-012
@@ -792,7 +792,7 @@ Parameterized test cases with the same behaviour are grouped.
 
 **last CF padding checks**
 
-- **Behaviour:** The padding checks are applied to the last CF (rules as for SF); failures are reported with EBADMSG and the PDU is dropped.
+- **Behaviour:** The padding checks are applied to the last CF (rules as for SF, CHK_PAD_DATA without RX_PADDING is ignored); failures are reported with EBADMSG and the PDU is dropped.
 - **Code:** protocolrx.c:isotp_rcv_cf() chk_pad_fail()
 
 ### RX-CF-009-CC8 .. RX-CF-009-FD64 (2 variants)

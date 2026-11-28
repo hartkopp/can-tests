@@ -452,9 +452,9 @@ static void api_opt_padchk(struct ft_ctx *ctx, const void *param)
 		uint32_t flags;
 		int ret;
 	} tc[] = {
-		{ CAN_ISOTP_CHK_PAD_DATA, -EINVAL },
-		{ CAN_ISOTP_CHK_PAD_DATA | CAN_ISOTP_CHK_PAD_LEN, -EINVAL },
-		{ CAN_ISOTP_CHK_PAD_DATA | CAN_ISOTP_TX_PADDING, -EINVAL },
+		{ CAN_ISOTP_CHK_PAD_DATA, 0 },
+		{ CAN_ISOTP_CHK_PAD_DATA | CAN_ISOTP_CHK_PAD_LEN, 0 },
+		{ CAN_ISOTP_CHK_PAD_DATA | CAN_ISOTP_TX_PADDING, 0 },
 		{ CAN_ISOTP_CHK_PAD_LEN, 0 },
 		{ CAN_ISOTP_RX_PADDING | CAN_ISOTP_CHK_PAD_DATA, 0 },
 		{ CAN_ISOTP_RX_PADDING | CAN_ISOTP_CHK_PAD_LEN |
@@ -2033,7 +2033,7 @@ static const struct ft_test tests[] = {
 	  "isotp.c:isotp_setsockopt_locked()", NULL),
 	T("API-OPT-013", "CAN_ISOTP_OPTS: padding check flags", 0,
 	  api_opt_padchk,
-	  "CAN_ISOTP_CHK_PAD_DATA needs CAN_ISOTP_RX_PADDING (rxpad_content), else EINVAL and the options are unchanged (also together with CAN_ISOTP_CHK_PAD_LEN). CAN_ISOTP_CHK_PAD_LEN without RX_PADDING (optimized frame length check) is accepted.",
+	  "All combinations of the padding check flags are accepted and stored, also CAN_ISOTP_CHK_PAD_DATA without CAN_ISOTP_RX_PADDING (ignored on reception) and CAN_ISOTP_CHK_PAD_LEN without RX_PADDING (optimized frame length check).",
 	  "isotp.c:isotp_setsockopt_locked() CAN_ISOTP_OPTS", NULL),
 	T("API-OPT-008", "CAN_ISOTP_RECV_FC values", 0, api_opt_recvfc,
 	  "CAN_ISOTP_RECV_FC stores bs and wftmax without checks. The reserved STmin values (0x80..0xF0, 0xFA..0xFF) are rejected with EINVAL and leave the stored values unchanged.",

@@ -512,6 +512,11 @@ static const struct fc_pad_case fc_pad_cases[] = {
 	/* RX_PADDING only: no checks */
 	{ "CC8", CAN_ISOTP_RX_PADDING, 0x55, 3, 0x00, -1, true },
 	{ "CC8", CAN_ISOTP_RX_PADDING, 0x55, 8, 0x13, -1, true },
+	/* CHK_PAD_DATA without RX_PADDING is ignored */
+	{ "CC8", CAN_ISOTP_CHK_PAD_DATA, 0xAA, 3, 0xCC, -1, true },
+	{ "CC8", CAN_ISOTP_CHK_PAD_DATA, 0xAA, 8, 0xCC, -1, true },
+	{ "CC8", CAN_ISOTP_CHK_PAD_LEN | CAN_ISOTP_CHK_PAD_DATA, 0xAA, 3, 0xCC, -1, true },
+	{ "CC8", CAN_ISOTP_CHK_PAD_LEN | CAN_ISOTP_CHK_PAD_DATA, 0xAA, 8, 0xCC, -1, false },
 	/* CAN FD */
 	{ "FD64", CAN_ISOTP_CHK_PAD_LEN, 0xCC, 3, 0xCC, -1, true },
 	{ "FD64", CAN_ISOTP_CHK_PAD_LEN, 0xCC, 8, 0xCC, -1, false },
@@ -1281,7 +1286,7 @@ static const struct ft_test tests[] = {
 	  "protocolrx.c:isotp_rcv() N_PCI length check, isotp_rcv_fc()",
 	  "DEVIATION (if observed): a FC without N_PCI is processed with data beyond CAN_DL (EBADMSG), fixed by xl-isotp split_v2 patch 17."),
 	T("TX-FC-011", "FC padding checks", 0, tx_fc_pad, NULL,
-	  "With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING is rejected by CAN_ISOTP_OPTS (API-OPT-013). The checks also apply to FCs of CAN XL N_PDUs (e.g. RX_PADDING|CHK_PAD_LEN rejects CAN_DL 100), without checks any CAN_DL is accepted. Failing FCs abort the transfer with EBADMSG.",
+	  "With CAN_ISOTP_CHK_PAD_LEN (without RX_PADDING) a FC must have the optimized length 3 (+ae). With RX_PADDING|CHK_PAD_LEN the FC length must be a valid CAN FD DLC length >= 8. With RX_PADDING|CHK_PAD_DATA all bytes behind the FC content must be rxpad_content. CHK_PAD_DATA without RX_PADDING is ignored. The checks also apply to FCs of CAN XL N_PDUs (e.g. RX_PADDING|CHK_PAD_LEN rejects CAN_DL 100), without checks any CAN_DL is accepted. Failing FCs abort the transfer with EBADMSG.",
 	  "protocolrx.c:isotp_rcv_fc(), chk_pad_fail(), chk_optimized_fail()", NULL),
 	T("TX-FC-012", "FC in idle state", 0, tx_fc_idle, NULL,
 	  "FC frames received without an active transfer are ignored silently.",
